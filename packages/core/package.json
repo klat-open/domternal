@@ -1,0 +1,68 @@
+{
+  "name": "@domternal/core",
+  "version": "0.0.1",
+  "description": "Framework-agnostic ProseMirror editor engine",
+  "author": "Domternal",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "prosemirror-commands": "^1.7.1",
+    "prosemirror-dropcursor": "^1.8.2",
+    "prosemirror-gapcursor": "^1.4.0",
+    "prosemirror-history": "^1.5.0",
+    "prosemirror-inputrules": "^1.5.1",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-model": "^1.25.4",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-transform": "^1.10.5",
+    "prosemirror-view": "^1.41.5"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "~5.9.3"
+  },
+  "keywords": [
+    "prosemirror",
+    "editor",
+    "rich-text",
+    "wysiwyg",
+    "domternal"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/domternal/domternal.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/domternal/domternal/issues"
+  },
+  "homepage": "https://domternal.dev"
+}

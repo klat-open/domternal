@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VERSION } from './index';
+import { VERSION } from './index.js';
 
 describe('core', () => {
   it('should export VERSION', () => {

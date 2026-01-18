@@ -37,3 +37,9 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Validate packages
+        run: |
+          cd packages/core
+          npx publint
+          npx @arethetypeswrong/cli --pack

@@ -1,25 +1,27 @@
 /**
- * @domternal/core
- * Framework-agnostic ProseMirror editor engine
+ * Core type definitions for @domternal/core
  */
 
-export const VERSION = '0.0.1';
-
-// === Type exports ===
+// Content types
 export type {
-  // Content types
   JSONAttribute,
   JSONMark,
   JSONContent,
   Content,
   Range,
-  // Editor options
+} from './Content.js';
+
+// Editor options
+export type {
   AnyExtension,
   TextDirection,
   FocusPosition,
   EditorOptions,
   ResolvedEditorOptions,
-  // Editor events
+} from './EditorOptions.js';
+
+// Editor events
+export type {
   EditorInstance,
   TransactionEventProps,
   FocusEventProps,
@@ -31,7 +33,10 @@ export type {
   DeleteEventProps,
   EditorEvents,
   EditorEventName,
-  // Command types
+} from './EditorEvents.js';
+
+// Command types
+export type {
   CommandEditor,
   CommandProps,
   Command,
@@ -42,12 +47,4 @@ export type {
   CanCommands,
   CanChainedCommands,
   KeyboardShortcutCommand,
-} from './types/index.js';
-
-// Editor class will be implemented here
-// export { Editor } from './Editor';
-
-// Extension system will be implemented here
-// export { Extension } from './Extension';
-// export { Node } from './Node';
-// export { Mark } from './Mark';
+} from './Commands.js';

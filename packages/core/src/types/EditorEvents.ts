@@ -38,8 +38,10 @@ export interface CreateEventProps {
  */
 export interface ContentErrorProps {
   editor: EditorInstance;
+  /** The validation error that occurred */
   error: Error;
-  disableCollaboration: () => void;
+  /** The original content that failed validation */
+  content: unknown;
 }
 
 /**
@@ -69,6 +71,7 @@ export interface DropEventProps {
  */
 export interface MountEventProps {
   editor: EditorInstance;
+  view: unknown;
 }
 
 /**

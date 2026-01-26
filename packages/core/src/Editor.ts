@@ -14,11 +14,20 @@ import { EventEmitter } from './EventEmitter.js';
 import { ExtensionManager } from './ExtensionManager.js';
 import { CommandManager } from './CommandManager.js';
 import { createDocument, isDocumentEmpty } from './helpers/index.js';
+import {
+  focus as focusCommand,
+  blur as blurCommand,
+  setContent as setContentCommand,
+  clearContent as clearContentCommand,
+} from './commands/index.js';
 import type {
   EditorOptions,
   EditorEvents,
   Content,
   FocusPosition,
+  SingleCommands,
+  ChainedCommands,
+  CanCommands,
 } from './types/index.js';
 
 /**
@@ -60,18 +69,23 @@ export class Editor extends EventEmitter<EditorEvents> {
 
   /**
    * Manages extensions and schema
+   * @internal Exposed for CommandManager, not for public use
    */
-  private extensionManager!: ExtensionManager;
+  private _extensionManager!: ExtensionManager;
+
+  /**
+   * Gets the extension manager
+   * @internal For CommandManager use only
+   */
+  get extensionManager(): ExtensionManager {
+    return this._extensionManager;
+  }
 
   /**
    * Manages commands
    */
   private commandManager!: CommandManager;
 
-  /**
-   * Validated schema (guaranteed non-null after constructor)
-   */
-  private validatedSchema!: Schema;
 
   /**
    * ProseMirror EditorView instance
@@ -101,11 +115,11 @@ export class Editor extends EventEmitter<EditorEvents> {
       );
     }
 
-    // Validate required options for Step 1.3
-    if (!options.schema) {
+    // Validate: need either schema or extensions
+    if (!options.schema && (!options.extensions || options.extensions.length === 0)) {
       throw new Error(
-        'Editor requires a schema in Step 1.3. ' +
-          'In Step 2, you can provide extensions instead and the schema will be built automatically.'
+        'Editor requires either schema or extensions. ' +
+          'Provide a ProseMirror schema directly, or use extensions like [Document, Paragraph, Text].'
       );
     }
 
@@ -113,9 +127,6 @@ export class Editor extends EventEmitter<EditorEvents> {
       editable: true,
       ...options,
     };
-
-    // Store validated schema (guaranteed non-null after check above)
-    this.validatedSchema = options.schema;
 
     this.createEditor();
   }
@@ -133,7 +144,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    * Gets the ProseMirror schema
    */
   get schema(): Schema {
-    return this.extensionManager.schema;
+    return this._extensionManager.schema;
   }
 
   /**
@@ -165,10 +176,35 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   /**
-   * Gets the command manager for executing commands
+   * Gets single commands for immediate execution
+   * @example editor.commands.focus('end')
    */
-  get commands(): CommandManager {
-    return this.commandManager;
+  get commands(): SingleCommands {
+    return this.commandManager.commands;
+  }
+
+  /**
+   * Creates a command chain for batched execution
+   * @example editor.chain().focus().insertText('Hello').run()
+   */
+  chain(): ChainedCommands {
+    return this.commandManager.chain();
+  }
+
+  /**
+   * Checks if commands can be executed (dry-run)
+   * @example if (editor.can().toggleBold()) { ... }
+   */
+  can(): CanCommands {
+    return this.commandManager.can();
+  }
+
+  /**
+   * Gets extension storage
+   * Access via: editor.storage.extensionName.propertyName
+   */
+  get storage(): Record<string, unknown> {
+    return this._extensionManager.storage;
   }
 
   // === Content Methods ===
@@ -216,7 +252,16 @@ export class Editor extends EventEmitter<EditorEvents> {
    * @param emitUpdate - Whether to emit update event (default: true)
    */
   setContent(content: Content, emitUpdate = true): this {
-    this.commandManager.setContent(content, { emitUpdate });
+    const tr = this.state.tr;
+    setContentCommand(content, { emitUpdate })({
+      editor: this,
+      state: this.state,
+      tr,
+      dispatch: (t) => { this.view.dispatch(t); },
+      chain: () => this.chain(),
+      can: () => this.can(),
+      commands: this.commands,
+    });
     return this;
   }
 
@@ -226,7 +271,16 @@ export class Editor extends EventEmitter<EditorEvents> {
    * @param emitUpdate - Whether to emit update event (default: true)
    */
   clearContent(emitUpdate = true): this {
-    this.commandManager.clearContent({ emitUpdate });
+    const tr = this.state.tr;
+    clearContentCommand({ emitUpdate })({
+      editor: this,
+      state: this.state,
+      tr,
+      dispatch: (t) => { this.view.dispatch(t); },
+      chain: () => this.chain(),
+      can: () => this.can(),
+      commands: this.commands,
+    });
     return this;
   }
 
@@ -253,7 +307,16 @@ export class Editor extends EventEmitter<EditorEvents> {
    * @param position - Where to place cursor (default: null = just focus)
    */
   focus(position: FocusPosition = null): this {
-    this.commandManager.focus(position);
+    const tr = this.state.tr;
+    focusCommand(position)({
+      editor: this,
+      state: this.state,
+      tr,
+      dispatch: (t) => { this.view.dispatch(t); },
+      chain: () => this.chain(),
+      can: () => this.can(),
+      commands: this.commands,
+    });
     return this;
   }
 
@@ -261,7 +324,16 @@ export class Editor extends EventEmitter<EditorEvents> {
    * Removes focus from the editor
    */
   blur(): this {
-    this.commandManager.blur();
+    const tr = this.state.tr;
+    blurCommand()({
+      editor: this,
+      state: this.state,
+      tr,
+      dispatch: (t) => { this.view.dispatch(t); },
+      chain: () => this.chain(),
+      can: () => this.can(),
+      commands: this.commands,
+    });
     return this;
   }
 
@@ -282,7 +354,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.view.destroy();
 
     // Destroy managers
-    this.extensionManager.destroy();
+    this._extensionManager.destroy();
 
     // Clear all event listeners
     this.removeAllListeners();
@@ -300,22 +372,28 @@ export class Editor extends EventEmitter<EditorEvents> {
     this.emit('beforeCreate', { editor: this });
     this.options.onBeforeCreate?.({ editor: this });
 
-    // 2. Initialize ExtensionManager with schema (validated in constructor)
-    this.extensionManager = new ExtensionManager(this.validatedSchema, this);
-    this.extensionManager.validateSchema();
+    // 2. Initialize ExtensionManager with extensions or schema
+    this._extensionManager = new ExtensionManager(
+      {
+        extensions: this.options.extensions,
+        schema: this.options.schema,
+      },
+      this
+    );
+    this._extensionManager.validateSchema();
 
     // 3. Create initial document from content
     const doc = createDocument(
       this.options.content ?? null,
-      this.extensionManager.schema
+      this._extensionManager.schema
     );
 
     // 4. Get plugins from extensions (empty in Step 1.3)
-    const plugins = this.extensionManager.plugins;
+    const plugins = this._extensionManager.plugins;
 
     // 5. Create EditorState
     const state = EditorState.create({
-      schema: this.extensionManager.schema,
+      schema: this._extensionManager.schema,
       doc,
       plugins,
     });
@@ -354,7 +432,7 @@ export class Editor extends EventEmitter<EditorEvents> {
     if (this.options.autofocus) {
       // Use setTimeout to ensure DOM is ready
       setTimeout(() => {
-        this.commandManager.focus(this.options.autofocus);
+        this.focus(this.options.autofocus);
       }, 0);
     }
 

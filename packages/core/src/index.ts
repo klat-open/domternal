@@ -62,7 +62,11 @@ export type {
 // === Core classes ===
 export { EventEmitter } from './EventEmitter.js';
 export { Editor } from './Editor.js';
-export { ExtensionManager } from './ExtensionManager.js';
+export {
+  ExtensionManager,
+  type ExtensionManagerOptions,
+  type ExtensionManagerEditor,
+} from './ExtensionManager.js';
 export {
   CommandManager,
   type SetContentOptions,
@@ -84,3 +88,27 @@ export {
 export { Extension } from './Extension.js';
 export { Node } from './Node.js';
 export { Mark } from './Mark.js';
+
+// === Command System ===
+export {
+  ChainBuilder,
+  createChainBuilder,
+  type ChainBuilderEditor,
+  type ChainBuilderOptions,
+} from './ChainBuilder.js';
+export {
+  CanChecker,
+  createCanChecker,
+  type CanCheckerEditor,
+  type CanCheckerOptions,
+} from './CanChecker.js';
+export {
+  builtInCommands,
+  focus,
+  blur,
+  setContent,
+  clearContent,
+  insertText,
+  deleteSelection,
+  selectAll,
+} from './commands/index.js';

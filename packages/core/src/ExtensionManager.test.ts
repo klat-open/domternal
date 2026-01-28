@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/only-throw-error */
 import { describe, it, expect, vi } from 'vitest';
 import { Schema } from 'prosemirror-model';
+import type { Plugin } from 'prosemirror-state';
 import { ExtensionManager } from './ExtensionManager.js';
 import { Extension } from './Extension.js';
 import { Node } from './Node.js';
@@ -271,11 +272,58 @@ describe('ExtensionManager', () => {
   });
 
   describe('plugins', () => {
-    it('returns empty array (Step 2.4.5 TODO)', () => {
+    it('returns empty array in schema mode', () => {
       const manager = new ExtensionManager({ schema: validSchema }, mockEditor);
 
       expect(manager.plugins).toEqual([]);
       expect(Array.isArray(manager.plugins)).toBe(true);
+    });
+
+    it('collects keyboard shortcuts into keymap plugin', () => {
+      const ExtWithShortcuts = Extension.create({
+        name: 'shortcuts',
+        addKeyboardShortcuts() {
+          return {
+            'Mod-b': () => true,
+          };
+        },
+      });
+
+      const manager = new ExtensionManager(
+        { extensions: [DocumentNode, ParagraphNode, TextNode, ExtWithShortcuts] },
+        mockEditor
+      );
+
+      expect(manager.plugins.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('collects custom plugins from extensions', () => {
+      const mockPlugin = { key: { key: 'test' } } as unknown as Plugin;
+      const ExtWithPlugin = Extension.create({
+        name: 'withPlugin',
+        addProseMirrorPlugins() {
+          return [mockPlugin];
+        },
+      });
+
+      const manager = new ExtensionManager(
+        { extensions: [DocumentNode, ParagraphNode, TextNode, ExtWithPlugin] },
+        mockEditor
+      );
+
+      expect(manager.plugins).toContain(mockPlugin);
+    });
+
+    it('caches plugins after first call', () => {
+      const manager = new ExtensionManager(
+        { extensions: [DocumentNode, ParagraphNode, TextNode] },
+        mockEditor
+      );
+
+      const plugins1 = manager.plugins;
+      const plugins2 = manager.plugins;
+
+      expect(plugins1).toBe(plugins2);
     });
   });
 

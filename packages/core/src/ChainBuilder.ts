@@ -20,7 +20,12 @@ import type {
   ChainedCommands,
   SingleCommands,
   CanCommands,
+  ChainFailure,
 } from './types/Commands.js';
+import {
+  buildCommandProps,
+  createAccumulatingDispatch,
+} from './commandPropsBuilder.js';
 
 /**
  * Editor interface for ChainBuilder
@@ -51,6 +56,18 @@ export class ChainBuilder {
   private readonly rawCommands: RawCommands;
   private readonly tr: Transaction;
   private shouldDispatch = true;
+  /** Cached proxy instance for performance (avoids creating new Proxy per command) */
+  private _cachedProxy: ChainedCommands | null = null;
+  /** Tracks the first command failure in the chain */
+  private _failure: ChainFailure | null = null;
+  /** Current command index in the chain */
+  private _commandIndex = 0;
+  /** Cached CommandProps for performance */
+  private _cachedProps: CommandProps | null = null;
+  /** Cached SingleCommands proxy for performance */
+  private _cachedSingleCommands: SingleCommands | null = null;
+  /** Cached CanCommands proxy for performance */
+  private _cachedCanCommands: CanCommands | null = null;
 
   constructor(options: ChainBuilderOptions) {
     this.editor = options.editor;
@@ -60,44 +77,39 @@ export class ChainBuilder {
   }
 
   /**
-   * Builds CommandProps for executing commands
+   * Gets cached CommandProps or builds new one
    * In chain mode, dispatch adds to shared transaction
    */
   private buildCommandProps(): CommandProps {
+    if (this._cachedProps) {
+      return this._cachedProps;
+    }
+
     const { editor, tr } = this;
-    const state = editor.view.state;
 
-    // Create dispatch that accumulates on shared transaction
-    const dispatch = (transaction: Transaction): void => {
-      // In chain mode, we don't dispatch immediately
-      // The transaction accumulates steps
-      // We only care that the command modified the transaction
-      if (transaction !== tr) {
-        // If command created a new transaction, copy its steps
-        for (const step of transaction.steps) {
-          tr.step(step);
-        }
-      }
-    };
-
-    return {
-      editor: editor as CommandProps['editor'],
-      state,
+    this._cachedProps = buildCommandProps({
+      editor,
       tr,
-      dispatch,
+      dispatch: createAccumulatingDispatch(tr),
       chain: () => this.proxy(),
       can: () => this.buildCanCommands(),
-      commands: this.buildSingleCommands(),
-    };
+      commands: () => this.buildSingleCommands(),
+    });
+
+    return this._cachedProps;
   }
 
   /**
-   * Builds SingleCommands for immediate execution within chain
+   * Gets cached SingleCommands proxy or builds new one
    */
   private buildSingleCommands(): SingleCommands {
+    if (this._cachedSingleCommands) {
+      return this._cachedSingleCommands;
+    }
+
     const { rawCommands } = this;
 
-    return new Proxy({} as SingleCommands, {
+    this._cachedSingleCommands = new Proxy({} as SingleCommands, {
       get: (_, name: string) => {
         const rawCommand = rawCommands[name];
         if (!rawCommand) {
@@ -109,15 +121,21 @@ export class ChainBuilder {
         };
       },
     });
+
+    return this._cachedSingleCommands;
   }
 
   /**
-   * Builds CanCommands for dry-run checks within chain
+   * Gets cached CanCommands proxy or builds new one
    */
   private buildCanCommands(): CanCommands {
+    if (this._cachedCanCommands) {
+      return this._cachedCanCommands;
+    }
+
     const { editor, rawCommands, tr } = this;
 
-    const canProxy = new Proxy({} as CanCommands, {
+    this._cachedCanCommands = new Proxy({} as CanCommands, {
       get: (_, name: string) => {
         if (name === 'chain') {
           // Return a function that creates a CanChainBuilder
@@ -136,7 +154,7 @@ export class ChainBuilder {
             tr,
             dispatch: undefined,
             chain: () => this.proxy(),
-            can: () => canProxy,
+            can: () => this.buildCanCommands(),
             commands: this.buildSingleCommands(),
           };
           return (rawCommand as (...a: unknown[]) => Command)(...args)(props);
@@ -144,7 +162,7 @@ export class ChainBuilder {
       },
     });
 
-    return canProxy;
+    return this._cachedCanCommands;
   }
 
   /**
@@ -204,12 +222,29 @@ export class ChainBuilder {
    *   .run();
    */
   command(fn: (props: CommandProps) => boolean): this {
+    const commandIndex = this._commandIndex++;
     const props = this.buildCommandProps();
     const result = fn(props);
-    if (!result) {
+    if (!result && !this._failure) {
       this.shouldDispatch = false;
+      this._failure = { command: 'command', args: [fn], index: commandIndex };
     }
     return this;
+  }
+
+  /**
+   * Get information about the first command that failed in the chain
+   *
+   * @returns ChainFailure object or null if no failure occurred
+   *
+   * @example
+   * const chain = editor.chain().toggleBold().setHeading(1);
+   * if (!chain.run()) {
+   *   console.log('Failed:', chain.getFailure());
+   * }
+   */
+  getFailure(): ChainFailure | null {
+    return this._failure;
   }
 
   /**
@@ -241,40 +276,65 @@ export class ChainBuilder {
   /**
    * Creates a Proxy that provides dynamic command methods
    * Each method returns `this` for chaining
+   *
+   * Caches the proxy instance for performance - avoids creating
+   * new Proxy objects for each command in the chain.
    */
   proxy(): ChainedCommands {
+    if (this._cachedProxy) {
+      return this._cachedProxy;
+    }
+
     const { rawCommands } = this;
 
-    return new Proxy({} as ChainedCommands, {
+    // Create proxy with local const - handlers reference this directly (no assertion needed)
+    const proxy: ChainedCommands = new Proxy({} as ChainedCommands, {
       get: (_, name: string) => {
         // Handle special methods
         if (name === 'run') {
           return () => this.run();
         }
 
+        if (name === 'getFailure') {
+          return () => this.getFailure();
+        }
+
         if (name === 'command') {
           return (fn: (props: CommandProps) => boolean) => {
             this.command(fn);
-            return this.proxy();
+            return proxy;
           };
         }
 
         // Handle dynamic commands
         const rawCommand = rawCommands[name];
         if (!rawCommand) {
-          return () => this.proxy();
+          return (...args: unknown[]) => {
+            const commandIndex = this._commandIndex++;
+            if (!this._failure) {
+              this.shouldDispatch = false;
+              this._failure = { command: name, args, index: commandIndex };
+            }
+            return proxy;
+          };
         }
 
         return (...args: unknown[]) => {
+          const commandIndex = this._commandIndex++;
           const props = this.buildCommandProps();
           const result = (rawCommand as (...a: unknown[]) => Command)(...args)(props);
-          if (!result) {
+          if (!result && !this._failure) {
             this.shouldDispatch = false;
+            this._failure = { command: name, args, index: commandIndex };
           }
-          return this.proxy();
+          return proxy;
         };
       },
     });
+
+    // Cache for subsequent calls
+    this._cachedProxy = proxy;
+    return proxy;
   }
 }
 

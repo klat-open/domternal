@@ -39,6 +39,7 @@ export type {
   RawCommands,
   SingleCommands,
   ChainedCommands,
+  ChainFailure,
   CanCommands,
   CanChainedCommands,
   KeyboardShortcutCommand,
@@ -103,7 +104,14 @@ export {
   type CanCheckerOptions,
 } from './CanChecker.js';
 export {
+  buildCommandProps,
+  createAccumulatingDispatch,
+  type CommandPropsEditor,
+  type BuildCommandPropsOptions,
+} from './commandPropsBuilder.js';
+export {
   builtInCommands,
+  // Basic commands
   focus,
   blur,
   setContent,
@@ -111,6 +119,23 @@ export {
   insertText,
   deleteSelection,
   selectAll,
+  // Mark commands
+  toggleMark,
+  setMark,
+  unsetMark,
+  // Block commands
+  setBlockType,
+  toggleBlockType,
+  // Wrap commands
+  wrapIn,
+  toggleWrap,
+  lift,
+  // List commands
+  toggleList,
+  // Insert commands
+  insertContent,
+  // Selection commands
+  selectNodeBackward,
 } from './commands/index.js';
 
 // === Nodes ===
@@ -125,4 +150,16 @@ export {
   type BlockquoteOptions,
   CodeBlock,
   type CodeBlockOptions,
+  BulletList,
+  type BulletListOptions,
+  OrderedList,
+  type OrderedListOptions,
+  ListItem,
+  type ListItemOptions,
+  HorizontalRule,
+  type HorizontalRuleOptions,
+  HardBreak,
+  type HardBreakOptions,
+  Image,
+  type ImageOptions,
 } from './nodes/index.js';

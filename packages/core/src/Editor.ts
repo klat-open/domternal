@@ -28,6 +28,7 @@ import type {
   SingleCommands,
   ChainedCommands,
   CanCommands,
+  Command,
 } from './types/index.js';
 
 /**
@@ -96,6 +97,11 @@ export class Editor extends EventEmitter<EditorEvents> {
    * Whether the editor has been destroyed
    */
   private _isDestroyed = false;
+
+  /**
+   * Timer for autofocus (cleared on destroy to prevent memory leaks)
+   */
+  private _autofocusTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Creates a new Editor instance
@@ -207,6 +213,150 @@ export class Editor extends EventEmitter<EditorEvents> {
     return this._extensionManager.storage;
   }
 
+  // === Active State Methods ===
+
+  /**
+   * Checks if a node or mark is currently active
+   *
+   * For toolbar button states - returns true if:
+   * - For marks: the current selection has the mark applied
+   * - For nodes: the cursor is inside that node type
+   *
+   * @param nameOrAttributes - Extension name, or object with name and attributes
+   * @param attributes - Optional attributes to match (for node/mark specific states)
+   *
+   * @example
+   * editor.isActive('bold') // → true if bold mark is active
+   * editor.isActive('heading', { level: 2 }) // → true if in h2
+   * editor.isActive({ name: 'textAlign', attributes: { align: 'center' } })
+   */
+  isActive(
+    nameOrAttributes: string | { name: string; attributes?: Record<string, unknown> },
+    attributes?: Record<string, unknown>
+  ): boolean {
+    // Normalize arguments
+    const name = typeof nameOrAttributes === 'string' ? nameOrAttributes : nameOrAttributes.name;
+    const attrs = typeof nameOrAttributes === 'string' ? attributes : nameOrAttributes.attributes;
+
+    const { state } = this;
+    const { selection, schema } = state;
+    const { from, to, $from } = selection;
+
+    // Check if it's a mark
+    const markType = schema.marks[name];
+    if (markType) {
+      // For empty selection, check marks at cursor or stored marks
+      if (selection.empty) {
+        const storedMarks = state.storedMarks ?? $from.marks();
+        const hasMark = storedMarks.some(mark => mark.type === markType);
+        if (!hasMark) return false;
+
+        // Check attributes if specified
+        if (attrs) {
+          const mark = storedMarks.find(m => m.type === markType);
+          return mark ? this.matchAttributes(mark.attrs, attrs) : false;
+        }
+        return true;
+      }
+
+      // For range selection, check if entire range has the mark
+      let hasMark = true;
+      state.doc.nodesBetween(from, to, (node) => {
+        if (node.isText) {
+          const nodeMark = node.marks.find(m => m.type === markType);
+          if (!nodeMark) {
+            hasMark = false;
+            return false; // Stop iteration
+          }
+          // Check attributes if specified
+          if (attrs && !this.matchAttributes(nodeMark.attrs, attrs)) {
+            hasMark = false;
+            return false;
+          }
+        }
+        return true;
+      });
+      return hasMark;
+    }
+
+    // Check if it's a node
+    const nodeType = schema.nodes[name];
+    if (nodeType) {
+      // Check if any node in selection path matches
+      // For block nodes, check parents of selection
+      for (let depth = $from.depth; depth >= 0; depth--) {
+        const node = $from.node(depth);
+        if (node.type === nodeType) {
+          // Check attributes if specified
+          if (attrs) {
+            return this.matchAttributes(node.attrs, attrs);
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * Gets attributes of the currently active node or mark
+   *
+   * Returns empty object if the node/mark is not found or not active.
+   *
+   * @param name - Extension name (node or mark)
+   *
+   * @example
+   * editor.getAttributes('heading') // → { level: 2 }
+   * editor.getAttributes('link') // → { href: 'https://...', target: '_blank' }
+   */
+  getAttributes(name: string): Record<string, unknown> {
+    const { state } = this;
+    const { selection, schema } = state;
+    const { $from } = selection;
+
+    // Check if it's a mark
+    const markType = schema.marks[name];
+    if (markType) {
+      // Get marks at cursor position or stored marks
+      const marks = state.storedMarks ?? $from.marks();
+      const mark = marks.find(m => m.type === markType);
+      return mark ? { ...mark.attrs } : {};
+    }
+
+    // Check if it's a node
+    const nodeType = schema.nodes[name];
+    if (nodeType) {
+      // Find node in selection path
+      for (let depth = $from.depth; depth >= 0; depth--) {
+        const node = $from.node(depth);
+        if (node.type === nodeType) {
+          return { ...node.attrs };
+        }
+      }
+      return {};
+    }
+
+    return {};
+  }
+
+  /**
+   * Helper to match attributes
+   * Returns true if target contains all key/value pairs from source
+   */
+  private matchAttributes(
+    target: Record<string, unknown>,
+    source: Record<string, unknown>
+  ): boolean {
+    for (const [key, value] of Object.entries(source)) {
+      if (target[key] !== value) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   // === Content Methods ===
 
   /**
@@ -246,14 +396,12 @@ export class Editor extends EventEmitter<EditorEvents> {
   }
 
   /**
-   * Sets the editor content
-   *
-   * @param content - JSON or HTML content
-   * @param emitUpdate - Whether to emit update event (default: true)
+   * Executes a command with proper CommandProps
+   * @internal
    */
-  setContent(content: Content, emitUpdate = true): this {
+  private runCommand(command: Command): boolean {
     const tr = this.state.tr;
-    setContentCommand(content, { emitUpdate })({
+    return command({
       editor: this,
       state: this.state,
       tr,
@@ -262,26 +410,27 @@ export class Editor extends EventEmitter<EditorEvents> {
       can: () => this.can(),
       commands: this.commands,
     });
-    return this;
+  }
+
+  /**
+   * Sets the editor content
+   *
+   * @param content - JSON or HTML content
+   * @param emitUpdate - Whether to emit update event (default: true)
+   * @returns true if content was set successfully, false if content was invalid
+   */
+  setContent(content: Content, emitUpdate = true): boolean {
+    return this.runCommand(setContentCommand(content, { emitUpdate }));
   }
 
   /**
    * Clears the editor content
    *
    * @param emitUpdate - Whether to emit update event (default: true)
+   * @returns true if content was cleared successfully
    */
-  clearContent(emitUpdate = true): this {
-    const tr = this.state.tr;
-    clearContentCommand({ emitUpdate })({
-      editor: this,
-      state: this.state,
-      tr,
-      dispatch: (t) => { this.view.dispatch(t); },
-      chain: () => this.chain(),
-      can: () => this.can(),
-      commands: this.commands,
-    });
-    return this;
+  clearContent(emitUpdate = true): boolean {
+    return this.runCommand(clearContentCommand({ emitUpdate }));
   }
 
   // === Lifecycle Methods ===
@@ -307,16 +456,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    * @param position - Where to place cursor (default: null = just focus)
    */
   focus(position: FocusPosition = null): this {
-    const tr = this.state.tr;
-    focusCommand(position)({
-      editor: this,
-      state: this.state,
-      tr,
-      dispatch: (t) => { this.view.dispatch(t); },
-      chain: () => this.chain(),
-      can: () => this.can(),
-      commands: this.commands,
-    });
+    this.runCommand(focusCommand(position));
     return this;
   }
 
@@ -324,16 +464,7 @@ export class Editor extends EventEmitter<EditorEvents> {
    * Removes focus from the editor
    */
   blur(): this {
-    const tr = this.state.tr;
-    blurCommand()({
-      editor: this,
-      state: this.state,
-      tr,
-      dispatch: (t) => { this.view.dispatch(t); },
-      chain: () => this.chain(),
-      can: () => this.can(),
-      commands: this.commands,
-    });
+    this.runCommand(blurCommand());
     return this;
   }
 
@@ -345,6 +476,12 @@ export class Editor extends EventEmitter<EditorEvents> {
   destroy(): void {
     if (this._isDestroyed) {
       return;
+    }
+
+    // Clear autofocus timer if pending
+    if (this._autofocusTimer) {
+      clearTimeout(this._autofocusTimer);
+      this._autofocusTimer = null;
     }
 
     this.emit('destroy');
@@ -387,11 +524,30 @@ export class Editor extends EventEmitter<EditorEvents> {
 
     this._extensionManager.validateSchema();
 
-    // 3. Create initial document from content
-    const doc = createDocument(
-      this.options.content ?? null,
-      this._extensionManager.schema
-    );
+    // 3. Create initial document from content (with graceful error handling)
+    let doc;
+    try {
+      doc = createDocument(
+        this.options.content ?? null,
+        this._extensionManager.schema
+      );
+    } catch (error) {
+      // Emit content error event for invalid content
+      const contentError = error instanceof Error ? error : new Error(String(error));
+      this.emit('contentError', {
+        editor: this,
+        error: contentError,
+        content: this.options.content,
+      });
+      this.options.onContentError?.({
+        editor: this,
+        error: contentError,
+        content: this.options.content,
+      });
+
+      // Fall back to empty document
+      doc = createDocument(null, this._extensionManager.schema);
+    }
 
     // 4. Get plugins from extensions (empty in Step 1.3)
     const plugins = this._extensionManager.plugins;
@@ -438,8 +594,12 @@ export class Editor extends EventEmitter<EditorEvents> {
     // 10. Handle autofocus
     if (this.options.autofocus) {
       // Use setTimeout to ensure DOM is ready
-      setTimeout(() => {
-        this.focus(this.options.autofocus);
+      // Store reference for cleanup on destroy
+      this._autofocusTimer = setTimeout(() => {
+        this._autofocusTimer = null;
+        if (!this._isDestroyed) {
+          this.focus(this.options.autofocus);
+        }
       }, 0);
     }
 

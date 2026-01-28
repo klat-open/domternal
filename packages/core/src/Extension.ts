@@ -82,6 +82,14 @@ export class Extension<Options = unknown, Storage = unknown> {
    * Protected constructor - use Extension.create() instead
    */
   protected constructor(config: ExtensionConfig<Options, Storage>) {
+    // Validate extension name (must be camelCase starting with lowercase letter)
+    if (!/^[a-z][a-zA-Z0-9]*$/.test(config.name)) {
+      throw new Error(
+        `Extension name '${config.name}' is invalid. ` +
+          `Names must be camelCase starting with a lowercase letter (e.g., 'myExtension').`
+      );
+    }
+
     this.config = config;
     this.name = config.name;
 
@@ -120,11 +128,22 @@ export class Extension<Options = unknown, Storage = unknown> {
    * Creates a new extension with merged options
    * Original extension is not modified
    *
+   * **Note:** Options are merged shallowly using object spread (`...`).
+   * Nested objects are replaced entirely, not deeply merged.
+   *
    * @param options - Options to merge with existing options
    * @returns New extension instance with merged options
    *
    * @example
    * const configured = MyExtension.configure({ enabled: false });
+   *
+   * @example
+   * // Shallow merge behavior with nested objects:
+   * // Given: options = { nested: { a: 1, b: 2 } }
+   * // configure({ nested: { b: 3 } })
+   * // Result: { nested: { b: 3 } } — 'a' is lost!
+   * // To preserve nested values, spread manually:
+   * // configure({ nested: { ...original.options.nested, b: 3 } })
    */
   configure(options: Partial<Options>): Extension<Options, Storage> {
     // Create new config with merged options
@@ -144,6 +163,10 @@ export class Extension<Options = unknown, Storage = unknown> {
    * Creates a new extension with extended configuration
    * Original extension is not modified
    *
+   * **Note:** Config is merged shallowly using object spread (`...`).
+   * Config properties (like `addCommands`, `addKeyboardShortcuts`) are
+   * replaced entirely, not combined with the base extension's config.
+   *
    * @param extendedConfig - Configuration to extend/override
    * @returns New extension instance with extended config
    *
@@ -152,6 +175,18 @@ export class Extension<Options = unknown, Storage = unknown> {
    *   name: 'extendedExtension',
    *   addCommands() {
    *     return { customCommand: () => ({ tr }) => true };
+   *   },
+   * });
+   *
+   * @example
+   * // To preserve base extension's commands while adding new ones:
+   * const Extended = BaseExtension.extend({
+   *   addCommands() {
+   *     const baseCommands = BaseExtension.config.addCommands?.call(this) ?? {};
+   *     return {
+   *       ...baseCommands,
+   *       newCommand: () => ({ tr }) => true,
+   *     };
    *   },
    * });
    */

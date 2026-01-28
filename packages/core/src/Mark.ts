@@ -92,6 +92,21 @@ export class Mark<Options = unknown, Storage = unknown> extends Extension<
   }
 
   /**
+   * Get MarkType or throw if not initialized.
+   * Use in contexts where editor is guaranteed to be set (like addCommands).
+   */
+  get markTypeOrThrow(): MarkType {
+    const type = this.markType;
+    if (!type) {
+      throw new Error(
+        `Mark "${this.name}" is not initialized. ` +
+        `Make sure the editor is created before accessing markType.`
+      );
+    }
+    return type;
+  }
+
+  /**
    * Creates a new mark instance
    *
    * @param config - Mark configuration
@@ -115,11 +130,22 @@ export class Mark<Options = unknown, Storage = unknown> extends Extension<
    * Creates a new mark with merged options
    * Original mark is not modified
    *
+   * **Note:** Options are merged shallowly using object spread (`...`).
+   * Nested objects are replaced entirely, not deeply merged.
+   *
    * @param options - Options to merge with existing options
    * @returns New mark instance with merged options
    *
    * @example
    * const CustomBold = Bold.configure({ HTMLAttributes: { class: 'custom-bold' } });
+   *
+   * @example
+   * // Shallow merge behavior with nested objects:
+   * // Given: options = { HTMLAttributes: { class: 'a', id: 'b' } }
+   * // configure({ HTMLAttributes: { class: 'c' } })
+   * // Result: { HTMLAttributes: { class: 'c' } } — 'id' is lost!
+   * // To preserve nested values, spread manually:
+   * // configure({ HTMLAttributes: { ...original.options.HTMLAttributes, class: 'c' } })
    */
   override configure(options: Partial<Options>): Mark<Options, Storage> {
     const newConfig: MarkConfig<Options, Storage> = {
@@ -137,6 +163,10 @@ export class Mark<Options = unknown, Storage = unknown> extends Extension<
    * Creates a new mark with extended configuration
    * Original mark is not modified
    *
+   * **Note:** Config is merged shallowly using object spread (`...`).
+   * Config properties (like `addAttributes`, `parseHTML`) are
+   * replaced entirely, not combined with the base mark's config.
+   *
    * @param extendedConfig - Configuration to extend/override
    * @returns New mark instance with extended config
    *
@@ -145,6 +175,15 @@ export class Mark<Options = unknown, Storage = unknown> extends Extension<
    *   name: 'customBold',
    *   addAttributes() {
    *     return { ...this.parent?.(), weight: { default: 'bold' } };
+   *   },
+   * });
+   *
+   * @example
+   * // To preserve base mark's parse rules while adding new ones:
+   * const Extended = BaseMark.extend({
+   *   parseHTML() {
+   *     const baseRules = BaseMark.config.parseHTML?.call(this) ?? [];
+   *     return [...baseRules, { tag: 'custom-tag' }];
    *   },
    * });
    */
@@ -229,16 +268,14 @@ export class Mark<Options = unknown, Storage = unknown> extends Extension<
 
             // Get attrs from attribute parseHTML functions
             const parsedAttrs: Record<string, unknown> = { ...ruleAttrs };
-            if (attributeSpecs) {
+
+            // Only run attribute parseHTML for element-based rules
+            // For style-based rules (where node is a string), the rule.getAttrs
+            // already handles extracting values from the style string
+            if (attributeSpecs && typeof node !== 'string') {
               for (const [name, attrSpec] of Object.entries(attributeSpecs)) {
                 if (attrSpec.parseHTML) {
-                  // For marks, parseHTML might receive string (style value) or HTMLElement
-                  parsedAttrs[name] =
-                    typeof node === 'string'
-                      ? attrSpec.parseHTML(
-                          document.createElement('span') // fallback element for style parsing
-                        )
-                      : attrSpec.parseHTML(node);
+                  parsedAttrs[name] = attrSpec.parseHTML(node);
                 }
               }
             }
@@ -250,7 +287,9 @@ export class Mark<Options = unknown, Storage = unknown> extends Extension<
         return parseRule;
       });
 
-      // Cast to satisfy strict MarkSpec.parseDOM type
+      // Cast required: Our MarkParseRule type is structurally compatible with
+      // ProseMirror's ParseRule but TypeScript can't infer this due to
+      // our custom getAttrs return type. The cast is safe.
       spec.parseDOM = parseDOMRules as unknown as readonly ParseRule[];
     }
 

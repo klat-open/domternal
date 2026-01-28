@@ -81,8 +81,14 @@ export {
   isNodeEmpty,
   isDocumentEmpty,
   callOrReturn,
+  markInputRule,
+  markInputRulePatterns,
+  isValidUrl,
+  extractUrls,
   type CreateDocumentOptions,
   type IsNodeEmptyOptions,
+  type MarkInputRuleOptions,
+  type IsValidUrlOptions,
 } from './helpers/index.js';
 
 // === Extension System ===
@@ -163,3 +169,26 @@ export {
   Image,
   type ImageOptions,
 } from './nodes/index.js';
+
+// === Marks ===
+export {
+  Bold,
+  type BoldOptions,
+  Italic,
+  type ItalicOptions,
+  Underline,
+  type UnderlineOptions,
+  Strike,
+  type StrikeOptions,
+  Code,
+  type CodeOptions,
+  Link,
+  type LinkOptions,
+  type LinkAttributes,
+  Subscript,
+  type SubscriptOptions,
+  Superscript,
+  type SuperscriptOptions,
+  Highlight,
+  type HighlightOptions,
+} from './marks/index.js';

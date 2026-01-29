@@ -46,6 +46,8 @@ export type {
   // Extension config types
   ExtensionEditor,
   AnyExtensionConfig,
+  GlobalAttributeSpec,
+  GlobalAttributes,
   ExtensionConfig,
   // Attribute types
   AttributeSpec,
@@ -85,10 +87,16 @@ export {
   markInputRulePatterns,
   isValidUrl,
   extractUrls,
+  generateHTML,
+  generateJSON,
+  generateText,
   type CreateDocumentOptions,
   type IsNodeEmptyOptions,
   type MarkInputRuleOptions,
   type IsValidUrlOptions,
+  type GenerateHTMLOptions,
+  type GenerateJSONOptions,
+  type GenerateTextOptions,
 } from './helpers/index.js';
 
 // === Extension System ===
@@ -142,6 +150,9 @@ export {
   insertContent,
   // Selection commands
   selectNodeBackward,
+  // Attribute commands
+  updateAttributes,
+  resetAttributes,
 } from './commands/index.js';
 
 // === Nodes ===
@@ -192,3 +203,32 @@ export {
   Highlight,
   type HighlightOptions,
 } from './marks/index.js';
+
+// === Extensions ===
+export {
+  History,
+  type HistoryOptions,
+  Dropcursor,
+  type DropcursorOptions,
+  Gapcursor,
+  TrailingNode,
+  type TrailingNodeOptions,
+  Placeholder,
+  placeholderPluginKey,
+  type PlaceholderOptions,
+  ListKeymap,
+  type ListKeymapOptions,
+  CharacterCount,
+  characterCountPluginKey,
+  type CharacterCountOptions,
+  type CharacterCountStorage,
+  Typography,
+  type TypographyOptions,
+  TextAlign,
+  type TextAlignOptions,
+  Focus,
+  focusPluginKey,
+  type FocusOptions,
+  StarterKit,
+  type StarterKitOptions,
+} from './extensions/index.js';

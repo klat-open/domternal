@@ -22,6 +22,8 @@ import {
   type HorizontalRuleOptions,
 } from '../nodes/HorizontalRule.js';
 import { HardBreak, type HardBreakOptions } from '../nodes/HardBreak.js';
+import { TaskList, type TaskListOptions } from '../nodes/TaskList.js';
+import { TaskItem, type TaskItemOptions } from '../nodes/TaskItem.js';
 
 // Marks
 import { Bold, type BoldOptions } from '../marks/Bold.js';
@@ -84,6 +86,14 @@ export interface StarterKitOptions {
    * Set to false to disable the HardBreak node, or pass options to configure it.
    */
   hardBreak?: false | Partial<HardBreakOptions>;
+  /**
+   * Set to false to disable the TaskList node, or pass options to configure it.
+   */
+  taskList?: false | Partial<TaskListOptions>;
+  /**
+   * Set to false to disable the TaskItem node, or pass options to configure it.
+   */
+  taskItem?: false | Partial<TaskItemOptions>;
 
   // Marks
   /**
@@ -169,6 +179,8 @@ export const StarterKit = Extension.create<StarterKitOptions>({
     maybeAdd(ListItem, this.options.listItem);
     maybeAdd(HorizontalRule, this.options.horizontalRule);
     maybeAdd(HardBreak, this.options.hardBreak);
+    maybeAdd(TaskList, this.options.taskList);
+    maybeAdd(TaskItem, this.options.taskItem);
 
     // Marks
     maybeAdd(Bold, this.options.bold);

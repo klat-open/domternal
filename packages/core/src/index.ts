@@ -179,6 +179,10 @@ export {
   type HardBreakOptions,
   Image,
   type ImageOptions,
+  TaskList,
+  type TaskListOptions,
+  TaskItem,
+  type TaskItemOptions,
 } from './nodes/index.js';
 
 // === Marks ===
@@ -202,10 +206,13 @@ export {
   type SuperscriptOptions,
   Highlight,
   type HighlightOptions,
+  TextStyle,
+  type TextStyleOptions,
 } from './marks/index.js';
 
 // === Extensions ===
 export {
+  // Core functionality
   History,
   type HistoryOptions,
   Dropcursor,
@@ -216,12 +223,14 @@ export {
   Placeholder,
   placeholderPluginKey,
   type PlaceholderOptions,
+  // List & Count
   ListKeymap,
   type ListKeymapOptions,
   CharacterCount,
   characterCountPluginKey,
   type CharacterCountOptions,
   type CharacterCountStorage,
+  // Styling
   Typography,
   type TypographyOptions,
   TextAlign,
@@ -229,6 +238,35 @@ export {
   Focus,
   focusPluginKey,
   type FocusOptions,
+  LineHeight,
+  type LineHeightOptions,
+  // Block Attributes
+  UniqueID,
+  uniqueIDPluginKey,
+  type UniqueIDOptions,
+  // Selection & Editor Utilities
+  Selection,
+  type SelectionOptions,
+  type SelectionStorage,
+  InvisibleChars,
+  invisibleCharsPluginKey,
+  type InvisibleCharsOptions,
+  type InvisibleCharsStorage,
+  // Text Style Extensions
+  TextColor,
+  type TextColorOptions,
+  FontFamily,
+  type FontFamilyOptions,
+  FontSize,
+  type FontSizeOptions,
+  // Menu Extensions
+  BubbleMenu,
+  bubbleMenuPluginKey,
+  type BubbleMenuOptions,
+  FloatingMenu,
+  floatingMenuPluginKey,
+  type FloatingMenuOptions,
+  // Bundle
   StarterKit,
   type StarterKitOptions,
 } from './extensions/index.js';

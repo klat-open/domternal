@@ -1,7 +1,7 @@
 {
-  "name": "@domternal/core",
+  "name": "@domternal/extension-image",
   "version": "0.0.1",
-  "description": "Framework-agnostic ProseMirror editor engine",
+  "description": "Image node extension for Domternal editor",
   "author": "Domternal",
   "license": "MIT",
   "type": "module",
@@ -14,7 +14,6 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "@domternal/source": "./src/index.ts",
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
@@ -37,45 +36,23 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "prosemirror-commands": "^1.7.1",
-    "prosemirror-dropcursor": "^1.8.2",
-    "prosemirror-gapcursor": "^1.4.0",
-    "prosemirror-history": "^1.5.0",
-    "prosemirror-inputrules": "^1.5.1",
-    "prosemirror-keymap": "^1.2.3",
-    "prosemirror-model": "^1.25.4",
-    "prosemirror-schema-list": "^1.5.1",
-    "prosemirror-state": "^1.4.4",
-    "prosemirror-tables": "^1.8.5",
-    "prosemirror-trailing-node": "^3.0.0",
-    "prosemirror-transform": "^1.10.5",
-    "prosemirror-view": "^1.41.5"
-  },
-  "peerDependencies": {
-    "linkedom": "^0.18.0"
-  },
-  "peerDependenciesMeta": {
-    "linkedom": {
-      "optional": true
-    }
+    "@domternal/core": "workspace:*"
   },
   "devDependencies": {
     "jsdom": "^27.4.0",
-    "linkedom": "^0.18.0",
     "tsup": "^8.5.1",
     "typescript": "~5.9.3"
   },
   "keywords": [
     "prosemirror",
     "editor",
-    "rich-text",
-    "wysiwyg",
+    "image",
     "domternal"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/domternal/domternal.git",
-    "directory": "packages/core"
+    "directory": "packages/extension-image"
   },
   "bugs": {
     "url": "https://github.com/domternal/domternal/issues"

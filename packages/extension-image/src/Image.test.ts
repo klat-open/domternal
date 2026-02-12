@@ -1,10 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import type { Node as PMNode } from 'prosemirror-model';
 import { Image } from './Image.js';
-import { Document } from './Document.js';
-import { Text } from './Text.js';
-import { Paragraph } from './Paragraph.js';
-import { Editor } from '../Editor.js';
+import { Document, Text, Paragraph, Editor } from '@domternal/core';
 
 describe('Image', () => {
   describe('configuration', () => {
@@ -63,7 +59,7 @@ describe('Image', () => {
       const spec = Image.createNodeSpec();
       const mockNode = {
         attrs: { src: 'https://example.com/img.png', alt: null, title: null, width: null, height: null },
-      } as unknown as PMNode;
+      } as any;
 
       const result = spec.toDOM?.(mockNode) as [string, Record<string, unknown>];
 
@@ -78,7 +74,7 @@ describe('Image', () => {
       const spec = CustomImage.createNodeSpec();
       const mockNode = {
         attrs: { src: 'https://example.com/img.png', alt: null, title: null, width: null, height: null },
-      } as unknown as PMNode;
+      } as any;
 
       const result = spec.toDOM?.(mockNode) as [string, Record<string, unknown>];
 
@@ -225,7 +221,7 @@ describe('Image', () => {
       const spec = Image.createNodeSpec();
       const mockNode = {
         attrs: { src: 'javascript:alert(1)', alt: null, title: null, width: null, height: null },
-      } as unknown as PMNode;
+      } as any;
       const result = spec.toDOM?.(mockNode) as [string, Record<string, unknown>];
       expect(result[0]).toBe('img');
       expect(result[1]['src']).toBe('');
@@ -259,7 +255,6 @@ describe('Image', () => {
         });
 
         const html = editor.getHTML();
-        // Invalid src is rejected - img renders without src attribute
         expect(html).not.toContain('javascript:');
         expect(html).not.toContain('src="javascript');
       });
@@ -271,7 +266,6 @@ describe('Image', () => {
         });
 
         const html = editor.getHTML();
-        // Invalid src is rejected - img renders without src attribute
         expect(html).not.toContain('data:image');
         expect(html).not.toContain('src="data:');
       });

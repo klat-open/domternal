@@ -10,10 +10,10 @@
  * - Double-checked in renderHTML as defense in depth
  */
 
-import { Node } from '../Node.js';
-import type { CommandSpec } from '../types/Commands.js';
+import { Node } from '@domternal/core';
+import type { CommandSpec } from '@domternal/core';
 
-declare module '../types/Commands.js' {
+declare module '@domternal/core' {
   interface RawCommands {
     setImage: CommandSpec<[attributes?: Record<string, unknown>]>;
   }
@@ -132,13 +132,22 @@ export const Image = Node.create<ImageOptions>({
     return {
       setImage:
         (attributes?: Record<string, unknown>) =>
-        ({ commands }) => {
+        ({ tr, dispatch }) => {
           // XSS protection: validate src URL before inserting
           if (attributes?.['src'] && !isValidImageSrc(attributes['src'], options.allowBase64)) {
             return false;
           }
 
-          return commands.insertContent({ type: name, ...attributes && { attrs: attributes } } as Parameters<typeof commands.insertContent>[0]);
+          const nodeType = tr.doc.type.schema.nodes[name];
+          if (!nodeType) return false;
+
+          if (dispatch) {
+            const node = nodeType.create(attributes ?? {});
+            tr.replaceSelectionWith(node);
+            dispatch(tr);
+          }
+
+          return true;
         },
     };
   },

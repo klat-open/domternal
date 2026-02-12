@@ -18,11 +18,14 @@
  * editor.commands.unsetLink();
  * ```
  */
+import { Plugin, PluginKey, TextSelection } from 'prosemirror-state';
 import { Mark } from '../Mark.js';
 import { isValidUrl } from '../helpers/isValidUrl.js';
+import { getMarkRange } from '../helpers/getMarkRange.js';
 import { linkClickPlugin } from './helpers/linkClickPlugin.js';
 import { linkPastePlugin } from './helpers/linkPastePlugin.js';
 import { autolinkPlugin } from './helpers/autolinkPlugin.js';
+import { linkExitPlugin } from './helpers/linkExitPlugin.js';
 
 /**
  * Options for the Link mark
@@ -70,6 +73,11 @@ export interface LinkOptions {
    * Return false to prevent auto-linking specific URLs
    */
   shouldAutoLink?: (url: string) => boolean;
+  /**
+   * Select the full link text range when clicking a link
+   * @default false
+   */
+  enableClickSelection: boolean;
 }
 
 /**
@@ -79,6 +87,8 @@ export interface LinkAttributes {
   href: string;
   target?: string | null;
   rel?: string | null;
+  title?: string | null;
+  class?: string | null;
 }
 
 /**
@@ -90,8 +100,13 @@ export const Link = Mark.create<LinkOptions>({
   // Links have lower priority than other marks
   priority: 1000,
 
-  // Links can contain other marks
-  inclusive: false,
+  // When autolink is enabled, the mark is inclusive so that typing at
+  // the end of a link naturally extends it (e.g. adding path segments
+  // to an autolinked URL). When autolink is off, links are set manually
+  // and should not extend on typing.
+  inclusive() {
+    return this.options.autolink;
+  },
 
   addOptions(): LinkOptions {
     return {
@@ -102,6 +117,7 @@ export const Link = Mark.create<LinkOptions>({
       autolink: true,
       linkOnPaste: true,
       defaultProtocol: 'https',
+      enableClickSelection: false,
     };
   },
 
@@ -114,6 +130,12 @@ export const Link = Mark.create<LinkOptions>({
         default: null,
       },
       rel: {
+        default: null,
+      },
+      title: {
+        default: null,
+      },
+      class: {
         default: null,
       },
     };
@@ -136,6 +158,8 @@ export const Link = Mark.create<LinkOptions>({
             href,
             target: node.getAttribute('target'),
             rel: node.getAttribute('rel'),
+            title: node.getAttribute('title'),
+            class: node.getAttribute('class'),
           };
         },
       },
@@ -179,14 +203,69 @@ export const Link = Mark.create<LinkOptions>({
         },
       unsetLink:
         () =>
-        ({ commands }) => commands.unsetMark('link'),
+        ({ tr, state, dispatch }) => {
+          const markType = state.schema.marks['link'];
+          if (!markType) return false;
+
+          const { from, to, empty } = tr.selection;
+
+          if (empty) {
+            // Extend to full link range around cursor
+            const $pos = tr.doc.resolve(from);
+            const range = getMarkRange($pos, markType);
+            if (!range) return false;
+            if (!dispatch) return true;
+            tr.removeMark(range.from, range.to, markType);
+          } else {
+            if (!dispatch) return true;
+            tr.removeMark(from, to, markType);
+          }
+
+          dispatch(tr);
+          return true;
+        },
       toggleLink:
         (attributes: LinkAttributes) =>
-        ({ commands }) => {
+        ({ tr, state, dispatch }) => {
           if (!isValidUrl(attributes.href, { protocols: this.options.protocols })) {
             return false;
           }
-          return commands.toggleMark('link', attributes);
+
+          const markType = state.schema.marks['link'];
+          if (!markType) return false;
+
+          const { from, to, empty } = tr.selection;
+
+          if (empty) {
+            // Extend to full link range around cursor
+            const $pos = tr.doc.resolve(from);
+            const range = getMarkRange($pos, markType);
+
+            if (range && tr.doc.rangeHasMark(range.from, range.to, markType)) {
+              // Has link — remove it from the full range
+              if (!dispatch) return true;
+              tr.removeMark(range.from, range.to, markType);
+            } else {
+              // No link — toggle stored mark for cursor
+              if (!dispatch) return true;
+              const cursorMarks = tr.storedMarks ?? state.storedMarks ?? $pos.marks();
+              if (markType.isInSet(cursorMarks)) {
+                tr.removeStoredMark(markType);
+              } else {
+                tr.addStoredMark(markType.create(attributes));
+              }
+            }
+          } else {
+            if (!dispatch) return true;
+            if (tr.doc.rangeHasMark(from, to, markType)) {
+              tr.removeMark(from, to, markType);
+            } else {
+              tr.addMark(from, to, markType.create(attributes));
+            }
+          }
+
+          dispatch(tr);
+          return true;
         },
     };
   },
@@ -208,6 +287,7 @@ export const Link = Mark.create<LinkOptions>({
         openOnClick: this.options.openOnClick === 'whenNotEditable'
           ? true
           : this.options.openOnClick,
+        enableClickSelection: this.options.enableClickSelection,
       })
     );
 
@@ -220,6 +300,35 @@ export const Link = Mark.create<LinkOptions>({
         })
       );
     }
+
+    // Exit plugin - ArrowRight at end of link exits the mark
+    plugins.push(linkExitPlugin({ type: markType }));
+
+    // keepOnSplit: strip link from storedMarks after a block split so that
+    // pressing Enter at the end of a link does not carry it to the new line.
+    plugins.push(
+      new Plugin({
+        key: new PluginKey('linkKeepOnSplit'),
+        appendTransaction(transactions, _oldState, newState) {
+          const docChanged = transactions.some((tr) => tr.docChanged);
+          if (!docChanged) return null;
+
+          const { selection } = newState;
+          if (!(selection instanceof TextSelection) || !selection.empty) return null;
+
+          const $cursor = selection.$cursor;
+          if ($cursor?.parentOffset !== 0) return null;
+
+          const stored = newState.storedMarks;
+          if (!stored) return null;
+
+          const hasLink = stored.some((m) => m.type === markType);
+          if (!hasLink) return null;
+
+          return newState.tr.setStoredMarks(stored.filter((m) => m.type !== markType));
+        },
+      })
+    );
 
     // Autolink plugin - converts typed URLs to links
     if (this.options.autolink) {

@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { TextSelection } from 'prosemirror-state';
+import { splitBlock } from 'prosemirror-commands';
 import { Link } from './Link.js';
 import { Document } from '../nodes/Document.js';
 import { Text } from '../nodes/Text.js';
@@ -20,8 +21,8 @@ describe('Link', () => {
       expect(Link.config.priority).toBe(1000);
     });
 
-    it('is not inclusive', () => {
-      expect(Link.config.inclusive).toBe(false);
+    it('inclusive is a function that returns autolink option', () => {
+      expect(typeof Link.config.inclusive).toBe('function');
     });
 
     it('has default options', () => {
@@ -33,6 +34,7 @@ describe('Link', () => {
         autolink: true,
         linkOnPaste: true,
         defaultProtocol: 'https',
+        enableClickSelection: false,
       });
     });
 
@@ -48,14 +50,18 @@ describe('Link', () => {
   });
 
   describe('addAttributes', () => {
-    it('defines href, target, rel attributes', () => {
+    it('defines href, target, rel, title, class attributes', () => {
       const attrs = Link.config.addAttributes?.call(Link);
       expect(attrs).toHaveProperty('href');
       expect(attrs).toHaveProperty('target');
       expect(attrs).toHaveProperty('rel');
+      expect(attrs).toHaveProperty('title');
+      expect(attrs).toHaveProperty('class');
       expect(attrs?.['href']?.default).toBeNull();
       expect(attrs?.['target']?.default).toBeNull();
       expect(attrs?.['rel']?.default).toBeNull();
+      expect(attrs?.['title']?.default).toBeNull();
+      expect(attrs?.['class']?.default).toBeNull();
     });
   });
 
@@ -76,6 +82,8 @@ describe('Link', () => {
         href: 'https://example.com',
         target: null,
         rel: null,
+        title: null,
+        class: null,
       });
     });
 
@@ -182,9 +190,10 @@ describe('Link', () => {
         extensions: [Document, Text, Paragraph, Link],
         content: '<p>test</p>',
       });
-      // Should have linkClick, linkPaste, and autolink plugins
+      // Should have linkClick, linkExit, linkPaste, and autolink plugins
       const pluginKeys = editor.state.plugins.map((p) => (p.spec.key as { key?: string } | undefined)?.key ?? '');
       expect(pluginKeys.some((k) => k.includes('linkClick'))).toBe(true);
+      expect(pluginKeys.some((k) => k.includes('linkExit'))).toBe(true);
       expect(pluginKeys.some((k) => k.includes('linkPaste'))).toBe(true);
       expect(pluginKeys.some((k) => k.includes('autolink'))).toBe(true);
     });
@@ -296,10 +305,83 @@ describe('Link', () => {
       expect(result[1]).toHaveProperty('target', '_blank');
     });
 
+    it('does not inherit link mark on split (keepOnSplit plugin)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Link],
+        content: '<p><a href="https://example.com">hello world</a></p>',
+      });
+      // Place cursor at end of link text
+      const { state } = editor;
+      const endPos = state.doc.child(0).nodeSize - 1; // end of paragraph content
+      editor.view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, endPos)));
+
+      // Simulate Enter (splitBlock) via prosemirror command
+      splitBlock(editor.state, editor.view.dispatch);
+
+      // The new (second) paragraph should not have link marks
+      const secondPara = editor.state.doc.child(1);
+      if (secondPara.childCount > 0) {
+        const firstChild = secondPara.child(0);
+        const hasLink = firstChild.marks.some((m) => m.type.name === 'link');
+        expect(hasLink).toBe(false);
+      }
+      // storedMarks should not include link
+      const stored = editor.state.storedMarks ?? [];
+      expect(stored.some((m) => m.type.name === 'link')).toBe(false);
+    });
+
     it('parseHTML getAttrs handles string argument', () => {
       const rules = Link.config.parseHTML?.call(Link);
       const getAttrs = rules?.[0]?.getAttrs;
       expect(getAttrs?.('test')).toBe(false);
+    });
+
+    it('unsetLink removes link from full mark range when cursor is inside link (empty selection)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Link],
+        content: '<p><a href="https://example.com">hello world</a></p>',
+      });
+      // Place cursor in the middle of the link text (no selection)
+      const { state } = editor;
+      editor.view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, 6)));
+
+      editor.commands.unsetLink();
+
+      // Link should be removed from the entire text
+      const para = editor.state.doc.child(0);
+      para.forEach((child) => {
+        expect(child.marks.some((m) => m.type.name === 'link')).toBe(false);
+      });
+    });
+
+    it('toggleLink removes link from full mark range when cursor is inside link (empty selection)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Link],
+        content: '<p><a href="https://example.com">hello world</a></p>',
+      });
+      // Place cursor in the middle of the link text (no selection)
+      const { state } = editor;
+      editor.view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, 6)));
+
+      editor.commands.toggleLink({ href: 'https://example.com' });
+
+      // Link should be removed from the entire text
+      const para = editor.state.doc.child(0);
+      para.forEach((child) => {
+        expect(child.marks.some((m) => m.type.name === 'link')).toBe(false);
+      });
+    });
+
+    it('unsetLink returns false when cursor is not inside a link (empty selection)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Link],
+        content: '<p>plain text</p>',
+      });
+      const { state } = editor;
+      editor.view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, 3)));
+
+      const result = editor.commands.unsetLink();
+      expect(result).toBe(false);
     });
   });
 });

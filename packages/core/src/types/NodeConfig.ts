@@ -6,7 +6,7 @@
  */
 
 import type { Node as PMNode, DOMOutputSpec, NodeType } from 'prosemirror-model';
-import type { EditorState } from 'prosemirror-state';
+import type { EditorState, Plugin } from 'prosemirror-state';
 import type { EditorView, NodeViewConstructor } from 'prosemirror-view';
 import type { ExtensionConfigBase, ExtensionContext } from './ExtensionConfig.js';
 import type { AttributeSpecs } from './AttributeSpec.js';
@@ -180,6 +180,14 @@ interface NodeSchemaProperties {
   isolating?: boolean;
 
   /**
+   * Whether a gap cursor is allowed inside this node.
+   * Set to false to prevent gapcursor from appearing inside this node.
+   * Set to true to force gapcursor even if the default heuristic disallows it.
+   * When undefined, uses ProseMirror's default heuristic.
+   */
+  allowGapCursor?: boolean;
+
+  /**
    * Whether this is a top-level node (document root)
    * Only one node should have this set to true
    */
@@ -252,6 +260,12 @@ interface NodeSchemaProperties {
    * For complex interactive nodes
    */
   addNodeView?: () => NodeViewConstructor;
+
+  /**
+   * Additional ProseMirror plugins for this node
+   * Called during plugin collection
+   */
+  addProseMirrorPlugins?: () => Plugin[];
 }
 
 /**

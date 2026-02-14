@@ -123,8 +123,11 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
 
   onCreate() {
     const { emojis: emojiData } = this.options;
-    const nameMap = buildNameMap(emojiData);
-    const shortcodeMap = buildShortcodeMap(emojiData);
+
+    // Maps may have already been built by addInputRules() (which runs first).
+    // Only build if not already present.
+    const nameMap = this.storage._nameMap ?? buildNameMap(emojiData);
+    const shortcodeMap = this.storage._shortcodeMap ?? buildShortcodeMap(emojiData);
     const frequencyMap = new Map<string, number>();
 
     this.storage.findEmoji = (name: string) => nameMap.get(name);
@@ -148,7 +151,7 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
         .sort((a, b) => b[1] - a[1])
         .map(([name]) => name);
 
-    // Store maps on storage for input rule / renderHTML / leafText access
+    // Ensure maps are on storage for renderHTML / leafText access
     this.storage._shortcodeMap = shortcodeMap;
     this.storage._nameMap = nameMap;
   },
@@ -260,12 +263,14 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
 
   addInputRules() {
     const rules: InputRule[] = [];
-    const shortcodeMap = this.storage._shortcodeMap;
+    const { emojis: emojiData, plainText, enableEmoticons } = this.options;
 
-    if (!shortcodeMap) return rules;
+    // Build maps eagerly — addInputRules() runs before onCreate(),
+    // so we must build and store maps now for the input rule callbacks.
+    this.storage._shortcodeMap ??= buildShortcodeMap(emojiData);
+    this.storage._nameMap ??= buildNameMap(emojiData);
 
     const nodeType = this.nodeType;
-    const { plainText } = this.options;
     const storage = this.storage;
 
     // Shortcode input rule: :shortcode: → emoji
@@ -276,7 +281,7 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
           const shortcode = match[1];
           if (!shortcode) return null;
 
-          const item = shortcodeMap.get(shortcode);
+          const item = storage._shortcodeMap?.get(shortcode);
           if (!item) return null;
 
           const { tr } = state;
@@ -297,51 +302,48 @@ export const Emoji = Node.create<EmojiOptions, EmojiStorage>({
     );
 
     // Emoticon input rules (if enabled)
-    if (this.options.enableEmoticons) {
-      // Build a single regex from all emoticons, sorted longest-first to avoid partial matches
+    if (enableEmoticons) {
       const emoticonEntries = Object.entries(emoticons);
       const nameMap = this.storage._nameMap;
-      if (nameMap) {
-        // Sort by length descending so longer emoticons match first
-        emoticonEntries.sort((a, b) => b[0].length - a[0].length);
 
-        for (const [emoticon, emojiName] of emoticonEntries) {
-          const item = nameMap.get(emojiName);
-          if (!item) continue;
+      // Sort by length descending so longer emoticons match first
+      emoticonEntries.sort((a, b) => b[0].length - a[0].length);
 
-          // Match emoticon preceded by space or start of text, followed by space
-          const pattern = new RegExp(`(?:^|\\s)(${escapeRegex(emoticon)})\\s$`);
+      for (const [emoticon, emojiName] of emoticonEntries) {
+        const item = nameMap.get(emojiName);
+        if (!item) continue;
 
-          rules.push(
-            new InputRule(
-              pattern,
-              (state: EditorState, match: RegExpMatchArray, start: number) => {
-                const { tr } = state;
+        // Match emoticon preceded by space or start of text, followed by space
+        const pattern = new RegExp(`(?:^|\\s)(${escapeRegex(emoticon)})\\s$`);
 
-                // Calculate the actual emoticon position (after the optional leading space)
-                const fullMatch = match[0];
-                const emoticonText = match[1];
-                if (!emoticonText) return null;
+        rules.push(
+          new InputRule(
+            pattern,
+            (state: EditorState, match: RegExpMatchArray, start: number) => {
+              const { tr } = state;
 
-                const emoticonStart = start + fullMatch.indexOf(emoticonText);
-                const emoticonEnd = emoticonStart + emoticonText.length;
+              // Calculate the actual emoticon position (after the optional leading space)
+              const fullMatch = match[0];
+              const emoticonText = match[1];
+              if (!emoticonText) return null;
 
-                if (plainText) {
-                  // Replace emoticon with emoji char, keep trailing space
-                  tr.replaceWith(emoticonStart, emoticonEnd, state.schema.text(item.emoji));
-                } else if (nodeType) {
-                  const node = nodeType.create({ name: item.name });
-                  tr.replaceWith(emoticonStart, emoticonEnd, node);
-                } else {
-                  return null;
-                }
+              const emoticonStart = start + fullMatch.indexOf(emoticonText);
+              const emoticonEnd = emoticonStart + emoticonText.length;
 
-                storage.addFrequentlyUsed(item.name);
-                return tr;
-              },
-            ),
-          );
-        }
+              if (plainText) {
+                tr.replaceWith(emoticonStart, emoticonEnd, state.schema.text(item.emoji));
+              } else if (nodeType) {
+                const node = nodeType.create({ name: item.name });
+                tr.replaceWith(emoticonStart, emoticonEnd, node);
+              } else {
+                return null;
+              }
+
+              storage.addFrequentlyUsed(item.name);
+              return tr;
+            },
+          ),
+        );
       }
     }
 

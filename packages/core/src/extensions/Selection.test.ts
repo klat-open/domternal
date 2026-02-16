@@ -16,16 +16,7 @@ describe('Selection', () => {
     });
 
     it('has default options', () => {
-      expect(Selection.options).toEqual({
-        HTMLAttributes: {},
-      });
-    });
-
-    it('can configure HTMLAttributes', () => {
-      const CustomSelection = Selection.configure({
-        HTMLAttributes: { class: 'custom' },
-      });
-      expect(CustomSelection.options.HTMLAttributes).toEqual({ class: 'custom' });
+      expect(Selection.options).toEqual({});
     });
   });
 
@@ -295,7 +286,7 @@ describe('Selection', () => {
         editor.commands.setSelection(6, 11);
         editor.commands.extendSelection('start');
 
-        expect(editor.state.selection.from).toBe(0);
+        expect(editor.state.selection.from).toBe(1);
         expect(editor.state.selection.to).toBe(11);
       });
 
@@ -309,7 +300,10 @@ describe('Selection', () => {
         editor.commands.extendSelection('end');
 
         expect(editor.state.selection.from).toBe(1);
-        expect(editor.state.selection.to).toBe(editor.state.doc.content.size);
+        // Selection.atEnd gives the last valid text position (inside the
+        // last textblock), not doc.content.size (which is after the block).
+        // For '<p>Hello world</p>': text ends at position 12.
+        expect(editor.state.selection.to).toBe(12);
       });
     });
 

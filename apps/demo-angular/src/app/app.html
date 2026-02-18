@@ -1,20 +1,32 @@
 <div class="demo">
-  <h1>Domternal Angular Demo</h1>
-
-  <div class="toolbar">
-    <button
-      (mousedown)="$event.preventDefault()"
-      (click)="toggleBold()"
-      [class.active]="isBoldActive()"
-      title="Toggle Bold (Cmd+B)"
-    >
-      <strong>B</strong>
+  <h1>
+    Domternal Angular Demo
+    <button class="theme-toggle" (click)="toggleTheme()" [title]="isDark() ? 'Switch to light' : 'Switch to dark'">
+      {{ isDark() ? '\u2600\uFE0F' : '\uD83C\uDF19' }}
     </button>
+  </h1>
+
+  <div class="dm-toolbar">
+    <div class="dm-toolbar-group">
+      <button
+        class="dm-toolbar-button"
+        [class.dm-toolbar-button--active]="boldActive()"
+        (mousedown)="$event.preventDefault()"
+        (click)="toggleBold()"
+        title="Toggle Bold (Cmd+B)"
+      >
+        <strong>B</strong>
+      </button>
+    </div>
   </div>
 
   <domternal-editor
+    #ec
     [extensions]="extensions"
     [content]="'<p>Hello <strong>World</strong>! Try selecting text and clicking Bold.</p>'"
+    (editorCreated)="onEditorCreated($event)"
+    (selectionChanged)="updateActiveStates()"
+    (contentUpdated)="updateActiveStates()"
   />
 
   <h3>HTML Output</h3>

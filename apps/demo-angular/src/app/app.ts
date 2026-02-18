@@ -1,6 +1,6 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { DomternalEditorComponent } from '@domternal/angular';
-import { Bold } from '@domternal/core';
+import { Bold, SelectionDecoration, Editor } from '@domternal/core';
 
 @Component({
   selector: 'app-root',
@@ -8,15 +8,26 @@ import { Bold } from '@domternal/core';
   templateUrl: './app.html',
 })
 export class App {
-  @ViewChild(DomternalEditorComponent) ec!: DomternalEditorComponent;
+  extensions = [Bold, SelectionDecoration];
+  editor: Editor | null = null;
+  isDark = signal(false);
+  boldActive = signal(false);
 
-  extensions = [Bold];
-
-  toggleBold(): void {
-    this.ec.editor?.commands.toggleBold();
+  onEditorCreated(editor: Editor): void {
+    this.editor = editor;
   }
 
-  isBoldActive(): boolean {
-    return this.ec.editor?.isActive('bold') ?? false;
+  toggleBold(): void {
+    this.editor?.commands.toggleBold();
+    this.updateActiveStates();
+  }
+
+  updateActiveStates(): void {
+    this.boldActive.set(this.editor?.isActive('bold') ?? false);
+  }
+
+  toggleTheme(): void {
+    this.isDark.update(v => !v);
+    document.body.classList.toggle('dm-theme-dark');
   }
 }

@@ -26,13 +26,29 @@
   --dm-focus-color: rgba(96, 165, 250, 0.3);
   --dm-selection: rgba(96, 165, 250, 0.25);
   --dm-code-surface: #2d2d2d;
-  --dm-code-color: #f472b6;
+  --dm-code-color: inherit;
   --dm-highlight-bg: rgba(255, 243, 205, 0.2);
+  --dm-blockquote-border: 3px solid #555555;
+  --dm-blockquote-color: #a0a0a0;
+
+  // Syntax highlighting
+  --dm-syntax-keyword: #ff7b72;
+  --dm-syntax-entity: #d2a8ff;
+  --dm-syntax-constant: #79c0ff;
+  --dm-syntax-string: #a5d6ff;
+  --dm-syntax-variable: #ffa657;
+  --dm-syntax-comment: #8b949e;
+  --dm-syntax-tag: #7ee787;
+  --dm-syntax-addition: #aff5b4;
+  --dm-syntax-addition-bg: #033a16;
+  --dm-syntax-deletion: #ffdcd7;
+  --dm-syntax-deletion-bg: #67060c;
 }
 
 .dm-theme-dark,
 .dm-theme-dark .dm-editor,
-.dm-theme-dark .dm-toolbar {
+.dm-theme-dark .dm-toolbar,
+.dm-theme-dark .dm-bubble-menu {
   @include dark-tokens;
 }
 
@@ -40,7 +56,8 @@
 @media (prefers-color-scheme: dark) {
   .dm-theme-auto,
   .dm-theme-auto .dm-editor,
-  .dm-theme-auto .dm-toolbar {
+  .dm-theme-auto .dm-toolbar,
+  .dm-theme-auto .dm-bubble-menu {
     @include dark-tokens;
   }
 }

@@ -3,7 +3,7 @@
  *
  * Manages extensions, schema, commands, and the ProseMirror EditorView/State.
  */
-import type { Transaction } from 'prosemirror-state';
+import type { Transaction, Plugin, PluginKey } from 'prosemirror-state';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { DOMSerializer } from 'prosemirror-model';
@@ -295,14 +295,26 @@ export class Editor extends EventEmitter<EditorEvents> {
       // of both ends of the selection for it to be considered active.
       const { $to } = selection;
 
+      // For list-group nodes, only the innermost list ancestor should be
+      // considered active. This prevents e.g. both bulletList and orderedList
+      // showing as active when a bullet list is nested inside an ordered list.
+      const isListNode = nodeType.spec.group?.split(' ').includes('list') ?? false;
+
       const findInPath = ($pos: typeof $from): boolean => {
         for (let depth = $pos.depth; depth >= 0; depth--) {
           const node = $pos.node(depth);
-          if (node.type === nodeType) {
-            if (attrs) {
-              return this.matchAttributes(node.attrs, attrs);
+
+          if (isListNode) {
+            const inListGroup = node.type.spec.group?.split(' ').includes('list') ?? false;
+            if (inListGroup) {
+              // First (innermost) list ancestor — only match if it's the target type
+              if (node.type !== nodeType) return false;
+              return attrs ? this.matchAttributes(node.attrs, attrs) : true;
             }
-            return true;
+          } else {
+            if (node.type === nodeType) {
+              return attrs ? this.matchAttributes(node.attrs, attrs) : true;
+            }
           }
         }
         return false;
@@ -489,6 +501,37 @@ export class Editor extends EventEmitter<EditorEvents> {
   blur(): this {
     this.runCommand(blurCommand());
     return this;
+  }
+
+  // === Dynamic Plugin Management ===
+
+  /**
+   * Registers a ProseMirror plugin dynamically at runtime.
+   * Used by framework wrappers (e.g. Angular BubbleMenu component) to add
+   * plugins after the editor is created.
+   */
+  registerPlugin(plugin: Plugin): void {
+    // Prevent duplicate registration (same plugin key)
+    if (plugin.spec.key?.get(this.view.state)) return;
+
+    const newState = this.view.state.reconfigure({
+      plugins: [...this.view.state.plugins, plugin],
+    });
+    this.view.updateState(newState);
+  }
+
+  /**
+   * Unregisters a ProseMirror plugin by its PluginKey.
+   * Uses PluginKey.get() to identify the plugin to remove.
+   */
+  unregisterPlugin(key: PluginKey): void {
+    const pluginToRemove = key.get(this.view.state);
+    if (!pluginToRemove) return;
+
+    const newState = this.view.state.reconfigure({
+      plugins: this.view.state.plugins.filter((p) => p !== pluginToRemove),
+    });
+    this.view.updateState(newState);
   }
 
   /**

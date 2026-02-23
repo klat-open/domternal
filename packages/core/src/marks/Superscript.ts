@@ -15,6 +15,7 @@
  * ```
  */
 import { Mark } from '../Mark.js';
+import type { ToolbarItem } from '../types/Toolbar.js';
 
 /**
  * Options for the Superscript mark
@@ -32,8 +33,9 @@ export interface SuperscriptOptions {
 export const Superscript = Mark.create<SuperscriptOptions>({
   name: 'superscript',
 
-  // Superscript and subscript are mutually exclusive
-  excludes: 'subscript',
+  // Mutual exclusion handled in toggle commands (not schema)
+  // so can() dry-run works correctly for toolbar disabled state
+  excludes: '',
 
   addOptions() {
     return {
@@ -60,7 +62,7 @@ export const Superscript = Mark.create<SuperscriptOptions>({
 
   addKeyboardShortcuts() {
     return {
-      'Mod-.': () => this.editor?.commands['toggleMark']?.('superscript') ?? false,
+      'Mod-.': () => this.editor?.commands['toggleSuperscript']?.() ?? false,
     };
   },
 
@@ -69,17 +71,34 @@ export const Superscript = Mark.create<SuperscriptOptions>({
       setSuperscript:
         () =>
         ({ commands }) => {
+          commands.unsetMark('subscript');
           return commands.setMark('superscript');
         },
       unsetSuperscript:
         () =>
-        ({ commands }) => {
-          return commands.unsetMark('superscript');
-        },
+        ({ commands }) => commands.unsetMark('superscript'),
       toggleSuperscript:
         () =>
-        ({ commands }) => commands.toggleMark('superscript'),
+        ({ commands }) => {
+          commands.unsetMark('subscript');
+          return commands.toggleMark('superscript');
+        },
     };
+  },
+  addToolbarItems(): ToolbarItem[] {
+    return [
+      {
+        type: 'button',
+        name: 'superscript',
+        command: 'toggleSuperscript',
+        isActive: 'superscript',
+        icon: 'textSuperscript',
+        label: 'Superscript',
+        shortcut: 'Mod-.',
+        group: 'format',
+        priority: 130,
+      },
+    ];
   },
 });
 

@@ -26,16 +26,26 @@
 // 4. Content typography
 @use 'content';
 
+// 4b. Syntax highlighting (CodeBlockLowlight)
+@use 'syntax';
+
 // 5. Toolbar
 @use 'toolbar';
+@use 'color-palette';
 
-// 6. Extension-specific styles
+// 6. Menus (bubble, floating, link popover)
+@use 'bubble-menu';
+@use 'floating-menu';
+@use 'link-popover';
+
+// 7. Extension-specific styles
 @use 'placeholder';
 @use 'task-list';
 @use 'mention';
 @use 'image';
 @use 'details';
+@use 'invisible-chars';
 
-// 7. Themes
+// 8. Themes
 @use 'themes/light';
 @use 'themes/dark';

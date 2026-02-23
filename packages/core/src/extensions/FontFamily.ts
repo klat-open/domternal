@@ -24,6 +24,7 @@
  */
 import { Extension } from '../Extension.js';
 import type { CommandSpec } from '../types/Commands.js';
+import type { ToolbarItem } from '../types/Toolbar.js';
 
 declare module '../types/Commands.js' {
   interface RawCommands {
@@ -34,8 +35,8 @@ declare module '../types/Commands.js' {
 
 export interface FontFamilyOptions {
   /**
-   * List of allowed font families. If empty, all fonts are allowed.
-   * @default []
+   * List of allowed font families.
+   * @default ['Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Times New Roman', 'Georgia', 'Palatino Linotype', 'Courier New']
    */
   fontFamilies: string[];
 }
@@ -45,7 +46,7 @@ export const FontFamily = Extension.create<FontFamilyOptions>({
 
   addOptions() {
     return {
-      fontFamilies: [],
+      fontFamilies: ['Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Times New Roman', 'Georgia', 'Palatino Linotype', 'Courier New'],
     };
   },
 
@@ -103,5 +104,40 @@ export const FontFamily = Extension.create<FontFamilyOptions>({
           return true;
         },
     };
+  },
+
+  addToolbarItems(): ToolbarItem[] {
+    if (this.options.fontFamilies.length === 0) return [];
+
+    return [
+      {
+        type: 'dropdown',
+        name: 'fontFamily',
+        icon: 'textAa',
+        label: 'Font Family',
+        group: 'textStyle',
+        priority: 150,
+        items: [
+          ...this.options.fontFamilies.map((font, i) => ({
+            type: 'button' as const,
+            name: `fontFamily-${font}`,
+            command: 'setFontFamily',
+            commandArgs: [font],
+            isActive: { name: 'textStyle', attributes: { fontFamily: font } },
+            icon: 'textAa',
+            label: font,
+            style: `font-family: ${font}`,
+            priority: 200 - i,
+          })),
+          {
+            type: 'button' as const,
+            name: 'unsetFontFamily',
+            command: 'unsetFontFamily',
+            icon: 'textAa',
+            label: 'Default',
+          },
+        ],
+      },
+    ];
   },
 });

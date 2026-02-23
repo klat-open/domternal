@@ -22,11 +22,13 @@ import type { ToolbarItem, ToolbarButton, ToolbarDropdown } from './types/Toolba
  */
 export interface ToolbarControllerEditor {
   readonly toolbarItems: ToolbarItem[];
+  readonly storage: Record<string, unknown>;
   isActive(
     nameOrAttributes: string | { name: string; attributes?: Record<string, unknown> },
     attributes?: Record<string, unknown>
   ): boolean;
   readonly commands: Record<string, (...args: unknown[]) => boolean>;
+  can(): Record<string, (...args: unknown[]) => boolean>;
   on(event: string, handler: (...args: unknown[]) => void): void;
   off(event: string, handler: (...args: unknown[]) => void): void;
 }
@@ -59,6 +61,9 @@ export class ToolbarController {
   /** Active state for each button (keyed by item.name) */
   private _activeMap = new Map<string, boolean>();
 
+  /** Disabled state for each button (keyed by item.name) */
+  private _disabledMap = new Map<string, boolean>();
+
   /** Currently open dropdown name (null = none) */
   private _openDropdown: string | null = null;
 
@@ -84,6 +89,10 @@ export class ToolbarController {
     return this._activeMap;
   }
 
+  get disabledMap(): ReadonlyMap<string, boolean> {
+    return this._disabledMap;
+  }
+
   get openDropdown(): string | null {
     return this._openDropdown;
   }
@@ -103,6 +112,13 @@ export class ToolbarController {
    */
   isActive(item: ToolbarButton): boolean {
     return this._activeMap.get(item.name) ?? false;
+  }
+
+  /**
+   * Checks if a toolbar button is currently disabled (command cannot execute).
+   */
+  isDisabled(item: ToolbarButton): boolean {
+    return this._disabledMap.get(item.name) ?? false;
   }
 
   /**
@@ -218,6 +234,7 @@ export class ToolbarController {
     }
     this._groups = [];
     this._activeMap.clear();
+    this._disabledMap.clear();
     this._flatButtons = [];
   }
 
@@ -289,13 +306,23 @@ export class ToolbarController {
   private updateActiveStates(): void {
     let changed = false;
 
+    // Cache can() proxy once per cycle — avoids creating a new Proxy per button
+    let canProxy: Record<string, (...args: unknown[]) => boolean> | null = null;
+    try {
+      canProxy = this.editor.can();
+    } catch {
+      // can() may throw if editor is in an invalid state
+    }
+
     for (const group of this._groups) {
       for (const item of group.items) {
         if (item.type === 'button') {
           if (this.checkButtonActive(item)) changed = true;
+          if (this.checkButtonDisabled(item, canProxy)) changed = true;
         } else if (item.type === 'dropdown') {
           for (const sub of item.items) {
             if (this.checkButtonActive(sub)) changed = true;
+            if (this.checkButtonDisabled(sub, canProxy)) changed = true;
           }
         }
       }
@@ -306,16 +333,58 @@ export class ToolbarController {
     }
   }
 
+  private checkButtonDisabled(
+    item: ToolbarButton,
+    canProxy: Record<string, (...args: unknown[]) => boolean> | null,
+  ): boolean {
+    const wasDisabled = this._disabledMap.get(item.name) ?? false;
+    let nowDisabled = false;
+
+    // Buttons with emitEvent are never disabled — they emit an event, not a command.
+    // They still participate in active-state checks (checkButtonActive) because
+    // active state reflects document state (e.g. link button shows active on links).
+    if (!item.emitEvent) {
+      try {
+        if (canProxy) {
+          const canCmd = canProxy[item.command];
+          if (canCmd) {
+            nowDisabled = item.commandArgs?.length
+              ? !canCmd(...item.commandArgs)
+              : !canCmd();
+          }
+        }
+      } catch {
+        // Command dry-run may throw (e.g. buggy extension) — treat as enabled
+      }
+    }
+
+    if (wasDisabled !== nowDisabled) {
+      this._disabledMap.set(item.name, nowDisabled);
+      return true;
+    }
+
+    return false;
+  }
+
   private checkButtonActive(item: ToolbarButton): boolean {
-    if (!item.isActive) return false;
+    if (!item.isActive && !item.isActiveFn) return false;
 
     const wasActive = this._activeMap.get(item.name) ?? false;
     let nowActive: boolean;
 
-    if (typeof item.isActive === 'string') {
+    if (item.isActiveFn) {
+      nowActive = item.isActiveFn(this.editor);
+    } else if (Array.isArray(item.isActive)) {
+      nowActive = item.isActive.some((check) => {
+        if (typeof check === 'string') return this.editor.isActive(check);
+        return this.editor.isActive(check.name, check.attributes);
+      });
+    } else if (typeof item.isActive === 'string') {
       nowActive = this.editor.isActive(item.isActive);
-    } else {
+    } else if (item.isActive) {
       nowActive = this.editor.isActive(item.isActive.name, item.isActive.attributes);
+    } else {
+      return false;
     }
 
     if (wasActive !== nowActive) {

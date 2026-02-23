@@ -55,20 +55,24 @@ export {
 } from './InvisibleChars.js';
 
 // Text Style Extensions (require TextStyle mark)
-export { TextColor, type TextColorOptions } from './TextColor.js';
+export { TextColor, DEFAULT_TEXT_COLORS, type TextColorOptions } from './TextColor.js';
 export { FontFamily, type FontFamilyOptions } from './FontFamily.js';
 export { FontSize, type FontSizeOptions } from './FontSize.js';
 
 // Menu Extensions
 export {
   BubbleMenu,
+  createBubbleMenuPlugin,
   bubbleMenuPluginKey,
   type BubbleMenuOptions,
+  type CreateBubbleMenuPluginOptions,
 } from './BubbleMenu.js';
 export {
   FloatingMenu,
+  createFloatingMenuPlugin,
   floatingMenuPluginKey,
   type FloatingMenuOptions,
+  type CreateFloatingMenuPluginOptions,
 } from './FloatingMenu.js';
 
 // Bundle

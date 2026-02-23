@@ -57,9 +57,13 @@ export interface ToolbarButton {
    * How to check if this button is active.
    * - string: extension name passed to `editor.isActive(name)`
    * - object: `{ name, attributes }` passed to `editor.isActive(name, attributes)`
+   * - array: OR-check — active if ANY entry matches (useful for attributes on multiple node types)
    * - undefined: button has no active state (e.g. undo/redo)
    */
-  isActive?: string | { name: string; attributes?: Record<string, unknown> };
+  isActive?:
+    | string
+    | { name: string; attributes?: Record<string, unknown> }
+    | (string | { name: string; attributes?: Record<string, unknown> })[];
 
   /** Icon key (resolved against IconSet) */
   icon: string;
@@ -75,6 +79,22 @@ export interface ToolbarButton {
 
   /** Sort order within group (higher = first). @default 100 */
   priority?: number;
+
+  /** Inline CSS style string applied to the button element (e.g. for font preview) */
+  style?: string;
+
+  /**
+   * Custom function to check active state.
+   * Use for extensions that track state in plugin storage rather than node/mark state.
+   * Takes precedence over `isActive` when defined.
+   */
+  isActiveFn?: (editor: { readonly storage: Record<string, unknown> }) => boolean;
+
+  /** Event name to emit on the editor when clicked. If set, the UI emits this event instead of executing the command. */
+  emitEvent?: string;
+
+  /** Color value (hex) for color-swatch rendering in grid-layout dropdowns. */
+  color?: string;
 }
 
 /**
@@ -113,6 +133,12 @@ export interface ToolbarDropdown {
 
   /** Sort order within group (higher = first). @default 100 */
   priority?: number;
+
+  /** Panel layout: 'list' (default vertical) or 'grid' (color-swatch grid). */
+  layout?: 'list' | 'grid';
+
+  /** Number of columns in grid layout. @default 10 */
+  gridColumns?: number;
 }
 
 /**
@@ -121,6 +147,9 @@ export interface ToolbarDropdown {
  */
 export interface ToolbarSeparator {
   type: 'separator';
+
+  /** Unique identifier (needed so all ToolbarItem variants share a `name` field) */
+  name?: string;
 
   /** Group name (used for ordering) */
   group?: string;

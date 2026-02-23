@@ -307,23 +307,36 @@ export const toggleMark: CommandSpec<[markName: string, attributes?: Attrs]> =
 
     const { from, to, empty } = tr.selection;
 
-    // Check if mark can be applied in this context
-    let canApply = false;
+    // Check if mark can be applied — respects both schema (allowsMarkType)
+    // and mark exclusions (e.g. code mark excludes bold/italic/etc.)
     if (empty) {
       const $pos = tr.doc.resolve(from);
-      canApply = $pos.parent.inlineContent && $pos.parent.type.allowsMarkType(markType);
+      if (!$pos.parent.inlineContent || !$pos.parent.type.allowsMarkType(markType)) {
+        return false;
+      }
+      const cursorMarks = tr.storedMarks ?? state.storedMarks ?? $pos.marks();
+      if (cursorMarks.some((m) => m.type.excludes(markType) && m.type !== markType)) {
+        return false;
+      }
     } else {
-      tr.doc.nodesBetween(from, to, (node) => {
-        if (canApply) return false;
-        if (node.inlineContent && node.type.allowsMarkType(markType)) {
-          canApply = true;
-          return false;
-        }
-        return;
-      });
-    }
+      const ctx = { parentAllows: false, hasText: false, hasApplicableText: false };
 
-    if (!canApply) return false;
+      tr.doc.nodesBetween(from, to, (node) => {
+        if (node.inlineContent && node.type.allowsMarkType(markType)) {
+          ctx.parentAllows = true;
+        }
+        if (node.isText) {
+          ctx.hasText = true;
+          if (!node.marks.some((m) => m.type.excludes(markType) && m.type !== markType)) {
+            ctx.hasApplicableText = true;
+          }
+        }
+      });
+
+      if (!ctx.parentAllows || (ctx.hasText && !ctx.hasApplicableText)) {
+        return false;
+      }
+    }
     if (!dispatch) return true;
 
     if (empty) {
@@ -629,20 +642,26 @@ export const toggleWrap: CommandSpec<[nodeName: string, attributes?: Attrs]> =
       }
     });
 
-    const allWrapped = contentBlocks.length > 0 && contentBlocks.every(({ pos }) => {
+    const isInsideWrap = (pos: number): boolean => {
       const $pos = tr.doc.resolve(pos);
       for (let d = $pos.depth; d > 0; d--) {
         if ($pos.node(d).type === nodeType) return true;
       }
       return false;
-    });
+    };
+
+    const allWrapped = contentBlocks.length > 0
+      ? contentBlocks.every(({ pos }) => isInsideWrap(pos))
+      : isInsideWrap(from);
 
     if (allWrapped) {
       // Narrow selection to the first non-empty textblock so lift() operates
-      // within the wrapper rather than at doc level.
+      // within the wrapper rather than at doc level. When all textblocks are
+      // empty, use the current selection position instead.
       const first = contentBlocks[0];
-      if (!first) return false;
-      tr.setSelection(TextSelection.create(tr.doc, first.pos + 1));
+      if (first) {
+        tr.setSelection(TextSelection.create(tr.doc, first.pos + 1));
+      }
       return lift()(props);
     }
 
@@ -706,10 +725,7 @@ export const toggleList: CommandSpec<[listNodeName: string, listItemNodeName: st
     const { from, to } = tr.selection;
     const contentBlocks: { pos: number; inTargetList: boolean; inSomeList: boolean; otherListPos: number | null }[] = [];
 
-    tr.doc.nodesBetween(from, to, (node, pos) => {
-      if (!node.isTextblock || node.content.size === 0) return;
-
-      const $pos = tr.doc.resolve(pos);
+    const collectListContext = ($pos: ReturnType<typeof tr.doc.resolve>, pos: number): void => {
       let inTargetList = false;
       let inSomeList = false;
       let otherListPos: number | null = null;
@@ -730,7 +746,19 @@ export const toggleList: CommandSpec<[listNodeName: string, listItemNodeName: st
       }
 
       contentBlocks.push({ pos, inTargetList, inSomeList, otherListPos });
+    };
+
+    tr.doc.nodesBetween(from, to, (node, pos) => {
+      if (!node.isTextblock || node.content.size === 0) return;
+      collectListContext(tr.doc.resolve(pos), pos);
     });
+
+    // Cursor in empty textblock (e.g. new list item): nodesBetween skipped it,
+    // but we still need its list context so toggle/convert/lift work correctly.
+    if (contentBlocks.length === 0) {
+      const $cur = tr.doc.resolve(from);
+      collectListContext($cur, from);
+    }
 
     const allInTargetList = contentBlocks.length > 0 && contentBlocks.every((b) => b.inTargetList);
     const allInSomeList = contentBlocks.length > 0 && contentBlocks.every((b) => b.inSomeList);

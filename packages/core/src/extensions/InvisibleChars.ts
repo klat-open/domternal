@@ -4,6 +4,8 @@
  * Shows invisible characters like spaces, paragraph marks, and hard breaks.
  * Useful for document editing where whitespace matters.
  *
+ * Styles are included automatically via `@domternal/theme` (`_invisible-chars.scss`).
+ *
  * @example
  * ```ts
  * import { InvisibleChars } from '@domternal/core';
@@ -16,6 +18,7 @@
  *       paragraph: true,
  *       hardBreak: true,
  *       space: true,
+ *       nbsp: true,
  *     }),
  *   ],
  * });
@@ -26,24 +29,13 @@
  * // Check current state
  * const isVisible = editor.storage.invisibleChars.isVisible();
  * ```
- *
- * ## CSS Required
- *
- * Add styles to your application:
- * ```css
- * .invisible-char {
- *   color: #999;
- *   font-size: 0.8em;
- *   pointer-events: none;
- *   user-select: none;
- * }
- * ```
  */
 import { Extension } from '../Extension.js';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
 import type { Editor } from '../Editor.js';
 import type { CommandSpec } from '../types/Commands.js';
+import type { ToolbarItem } from '../types/Toolbar.js';
 
 declare module '../types/Commands.js' {
   interface RawCommands {
@@ -174,15 +166,17 @@ export const InvisibleChars = Extension.create<
     return {
       toggleInvisibleChars:
         () =>
-        () => {
-          this.storage.toggle();
+        ({ dispatch }) => {
+          if (dispatch) {
+            this.storage.toggle();
+          }
           return true;
         },
 
       showInvisibleChars:
         () =>
-        () => {
-          if (!this.storage.isVisible()) {
+        ({ dispatch }) => {
+          if (dispatch && !this.storage.isVisible()) {
             this.storage.toggle();
           }
           return true;
@@ -190,13 +184,42 @@ export const InvisibleChars = Extension.create<
 
       hideInvisibleChars:
         () =>
-        () => {
-          if (this.storage.isVisible()) {
+        ({ dispatch }) => {
+          if (dispatch && this.storage.isVisible()) {
             this.storage.toggle();
           }
           return true;
         },
     };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Shift-8': () => {
+        return this.editor?.commands.toggleInvisibleChars() ?? false;
+      },
+    };
+  },
+
+  addToolbarItems(): ToolbarItem[] {
+    return [
+      {
+        type: 'button',
+        name: 'invisibleChars',
+        command: 'toggleInvisibleChars',
+        icon: 'paragraph',
+        label: 'Invisible Characters',
+        shortcut: 'Mod-Shift-8',
+        group: 'utility',
+        priority: 100,
+        isActiveFn: (editor) => {
+          const storage = editor.storage['invisibleChars'] as
+            | { isVisible?: () => boolean }
+            | undefined;
+          return storage?.isVisible?.() ?? false;
+        },
+      },
+    ];
   },
 
   addProseMirrorPlugins() {
@@ -240,7 +263,7 @@ export const InvisibleChars = Extension.create<
                     endPos,
                     () => {
                       const span = document.createElement('span');
-                      span.className = options.className;
+                      span.className = `${options.className} ${options.className}--paragraph`;
                       span.textContent = CHARS.paragraph;
                       return span;
                     },
@@ -256,7 +279,7 @@ export const InvisibleChars = Extension.create<
                     pos,
                     () => {
                       const span = document.createElement('span');
-                      span.className = options.className;
+                      span.className = `${options.className} ${options.className}--hardBreak`;
                       span.textContent = CHARS.hardBreak;
                       return span;
                     },
@@ -276,7 +299,7 @@ export const InvisibleChars = Extension.create<
                   if (options.space && char === ' ') {
                     decorations.push(
                       Decoration.inline(charPos, charPos + 1, {
-                        class: options.className,
+                        class: `${options.className} ${options.className}--space`,
                         'data-char': 'space',
                       })
                     );

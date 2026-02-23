@@ -69,6 +69,9 @@ export type {
   ToolbarItem,
 } from './types/index.js';
 
+// === ProseMirror re-exports (for framework wrappers) ===
+export { PluginKey } from 'prosemirror-state';
+
 // === Core classes ===
 export { EventEmitter } from './EventEmitter.js';
 export { Editor } from './Editor.js';
@@ -282,6 +285,7 @@ export {
   type InvisibleCharsStorage,
   // Text Style Extensions
   TextColor,
+  DEFAULT_TEXT_COLORS,
   type TextColorOptions,
   FontFamily,
   type FontFamilyOptions,
@@ -289,11 +293,15 @@ export {
   type FontSizeOptions,
   // Menu Extensions
   BubbleMenu,
+  createBubbleMenuPlugin,
   bubbleMenuPluginKey,
   type BubbleMenuOptions,
+  type CreateBubbleMenuPluginOptions,
   FloatingMenu,
+  createFloatingMenuPlugin,
   floatingMenuPluginKey,
   type FloatingMenuOptions,
+  type CreateFloatingMenuPluginOptions,
   // Bundle
   StarterKit,
   type StarterKitOptions,

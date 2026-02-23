@@ -10,12 +10,18 @@
     <domternal-toolbar [editor]="editor" />
   }
 
-  <domternal-editor
-    #ec
-    [extensions]="extensions"
-    [content]="'<p>Hello <strong>World</strong>! Try the toolbar buttons above.</p>'"
-    (editorCreated)="onEditorCreated($event)"
-  />
+  <div style="position: relative;">
+    <domternal-editor
+      #ec
+      [extensions]="extensions"
+      [content]="'<p>Hello <strong>World</strong>! Try the toolbar buttons above.</p><pre><code class=&quot;language-javascript&quot;>function greet(name) {\n  const message = `Hello, ${name}!`;\n  console.log(message); // prints greeting\n  return message;\n}</code></pre><p>Code blocks now have <em>syntax highlighting</em>.</p>'"
+      (editorCreated)="onEditorCreated($event)"
+    />
+
+    @if (editor) {
+      <domternal-bubble-menu [editor]="editor"></domternal-bubble-menu>
+    }
+  </div>
 
   <h3>HTML Output</h3>
   <pre class="output">{{ ec.htmlContent() }}</pre>

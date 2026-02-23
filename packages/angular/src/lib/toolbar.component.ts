@@ -45,7 +45,7 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
         <div class="dm-toolbar-separator" role="separator"></div>
       }
       <div class="dm-toolbar-group" role="group" [attr.aria-label]="group.name || 'Tools'">
-        @for (item of group.items; track $index) {
+        @for (item of group.items; track item.name) {
           @if (item.type === 'button') {
             <button
               type="button"
@@ -55,9 +55,10 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
               [attr.aria-label]="asButton(item).label"
               [title]="getTooltip(asButton(item))"
               [tabindex]="getFlatIndex(item.name) === focusedIndex() ? 0 : -1"
+              [disabled]="isDisabled(item.name)"
               [innerHTML]="getCachedIcon(asButton(item).icon)"
               (mousedown)="$event.preventDefault()"
-              (click)="onButtonClick(asButton(item))"
+              (click)="onButtonClick(asButton(item), $event)"
               (focus)="onButtonFocus(item.name)"
             ></button>
           }
@@ -78,20 +79,52 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
                 (focus)="onButtonFocus(item.name)"
               ></button>
               @if (openDropdown() === asDropdown(item).name) {
-                <div class="dm-toolbar-dropdown-panel" role="menu">
-                  @for (sub of asDropdown(item).items; track sub.name) {
-                    <button
-                      type="button"
-                      class="dm-toolbar-dropdown-item"
-                      [class.dm-toolbar-dropdown-item--active]="isActive(sub.name)"
-                      role="menuitem"
-                      [attr.aria-label]="sub.label"
-                      [innerHTML]="getCachedItemIcon(sub.icon, sub.label)"
-                      (mousedown)="$event.preventDefault()"
-                      (click)="onDropdownItemClick(sub)"
-                    ></button>
-                  }
-                </div>
+                @if (asDropdown(item).layout === 'grid') {
+                  <div class="dm-toolbar-dropdown-panel dm-color-palette" role="menu"
+                       [attr.style]="getGridStyle(asDropdown(item))">
+                    @for (sub of asDropdown(item).items; track sub.name) {
+                      @if (sub.color) {
+                        <button
+                          type="button"
+                          class="dm-color-swatch"
+                          [class.dm-color-swatch--active]="isActive(sub.name)"
+                          role="menuitem"
+                          [attr.aria-label]="sub.label"
+                          [title]="sub.label"
+                          [style.background-color]="sub.color"
+                          (mousedown)="$event.preventDefault()"
+                          (click)="onDropdownItemClick(sub)"
+                        ></button>
+                      } @else {
+                        <button
+                          type="button"
+                          class="dm-color-palette-reset"
+                          role="menuitem"
+                          [attr.aria-label]="sub.label"
+                          [innerHTML]="getCachedItemIcon(sub.icon, sub.label)"
+                          (mousedown)="$event.preventDefault()"
+                          (click)="onDropdownItemClick(sub)"
+                        ></button>
+                      }
+                    }
+                  </div>
+                } @else {
+                  <div class="dm-toolbar-dropdown-panel" role="menu">
+                    @for (sub of asDropdown(item).items; track sub.name) {
+                      <button
+                        type="button"
+                        class="dm-toolbar-dropdown-item"
+                        [class.dm-toolbar-dropdown-item--active]="isActive(sub.name)"
+                        role="menuitem"
+                        [attr.aria-label]="sub.label"
+                        [attr.style]="sub.style ?? null"
+                        [innerHTML]="getCachedItemIcon(sub.icon, sub.label)"
+                        (mousedown)="$event.preventDefault()"
+                        (click)="onDropdownItemClick(sub)"
+                      ></button>
+                    }
+                  </div>
+                }
               }
             </div>
           }
@@ -139,6 +172,11 @@ export class DomternalToolbarComponent implements OnDestroy {
   isActive(name: string): boolean {
     this.activeVersion(); // subscribe to changes
     return this.controller?.activeMap.get(name) ?? false;
+  }
+
+  isDisabled(name: string): boolean {
+    this.activeVersion(); // subscribe to changes
+    return this.controller?.disabledMap.get(name) ?? false;
   }
 
   isDropdownActive(dropdown: ToolbarDropdown): boolean {
@@ -200,9 +238,19 @@ export class DomternalToolbarComponent implements OnDestroy {
     return item as ToolbarDropdown;
   }
 
+  getGridStyle(dropdown: ToolbarDropdown): string {
+    return `--dm-palette-columns: ${String(dropdown.gridColumns ?? 10)}`;
+  }
+
   // === Event handlers ===
 
-  onButtonClick(item: ToolbarButton): void {
+  onButtonClick(item: ToolbarButton, event?: MouseEvent): void {
+    if (item.emitEvent) {
+      const anchor = event?.currentTarget as HTMLElement | undefined;
+      // emitEvent is a dynamic string; cast needed to bypass strict EventEmitter<EditorEvents> typing
+      (this.editor().emit as (e: string, d: unknown) => void)(item.emitEvent, { anchorElement: anchor });
+      return;
+    }
     this.controller?.executeCommand(item);
   }
 

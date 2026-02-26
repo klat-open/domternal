@@ -87,6 +87,13 @@ export {
   type CommandManagerEditor,
 } from './CommandManager.js';
 
+// === Floating UI ===
+export {
+  positionFloating,
+  positionFloatingOnce,
+  type PositionFloatingOptions,
+} from './utils/positionFloating.js';
+
 // === Helpers ===
 export {
   createDocument,
@@ -165,6 +172,7 @@ export {
   toggleMark,
   setMark,
   unsetMark,
+  unsetAllMarks,
   // Block commands
   setBlockType,
   toggleBlockType,
@@ -292,6 +300,8 @@ export {
   type FontFamilyOptions,
   FontSize,
   type FontSizeOptions,
+  // Formatting Utilities
+  ClearFormatting,
   // Menu Extensions
   BubbleMenu,
   createBubbleMenuPlugin,

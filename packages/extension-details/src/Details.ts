@@ -16,7 +16,7 @@
  */
 
 import { Node, findParentNode, findChildren, defaultBlockAt } from '@domternal/core';
-import type { CommandSpec } from '@domternal/core';
+import type { CommandSpec, ToolbarItem } from '@domternal/core';
 import { Plugin, PluginKey, Selection, TextSelection } from 'prosemirror-state';
 import type { ViewMutationRecord } from 'prosemirror-view';
 import { isNodeVisible } from './helpers/isNodeVisible.js';
@@ -30,6 +30,7 @@ declare module '@domternal/core' {
     toggleDetails: CommandSpec;
     openDetails: CommandSpec;
     closeDetails: CommandSpec;
+    setDetailsOpen: CommandSpec<[open: boolean]>;
   }
 }
 
@@ -118,29 +119,20 @@ export const Details = Node.create<DetailsOptions>({
 
       const toggle = document.createElement('button');
       toggle.type = 'button';
+      toggle.addEventListener('mousedown', (e) => { e.preventDefault(); });
       dom.append(toggle);
 
       const content = document.createElement('div');
       dom.append(content);
 
       const toggleDetailsContent = (setToValue?: boolean): void => {
-        if (setToValue !== undefined) {
-          if (setToValue) {
-            if (dom.classList.contains(options.openClassName)) return;
-            dom.classList.add(options.openClassName);
-          } else {
-            if (!dom.classList.contains(options.openClassName)) return;
-            dom.classList.remove(options.openClassName);
-          }
-        } else {
-          dom.classList.toggle(options.openClassName);
-        }
+        const isOpen = dom.classList.contains(options.openClassName);
+        if (setToValue !== undefined && setToValue === isOpen) return;
 
-        const event = new Event('toggleDetailsContent');
-        const detailsContentEl = content.querySelector(
-          ':scope > div[data-details-content]',
-        );
-        detailsContentEl?.dispatchEvent(event);
+        dom.classList.toggle(options.openClassName, setToValue);
+        content
+          .querySelector(':scope > div[data-details-content]')
+          ?.dispatchEvent(new Event('toggleDetailsContent'));
       };
 
       if (node.attrs['open']) {
@@ -196,6 +188,21 @@ export const Details = Node.create<DetailsOptions>({
         },
       };
     };
+  },
+
+  addToolbarItems(): ToolbarItem[] {
+    return [
+      {
+        type: 'button',
+        name: 'details',
+        command: 'toggleDetails',
+        isActive: 'details',
+        icon: 'caretDown',
+        label: 'Toggle Details',
+        group: 'insert',
+        priority: 100,
+      },
+    ];
   },
 
   addCommands() {
@@ -305,8 +312,11 @@ export const Details = Node.create<DetailsOptions>({
           return commands.setDetails();
         },
 
-      openDetails:
-        () =>
+      openDetails: () => ({ commands }) => commands.setDetailsOpen(true),
+      closeDetails: () => ({ commands }) => commands.setDetailsOpen(false),
+
+      setDetailsOpen:
+        (open: boolean) =>
         ({ state, tr, dispatch }) => {
           if (!this.options.persist) return false;
 
@@ -318,37 +328,12 @@ export const Details = Node.create<DetailsOptions>({
           )(state.selection);
 
           if (!details) return false;
-          if (details.node.attrs['open']) return false; // already open
+          if (!!details.node.attrs['open'] === open) return false;
 
           if (dispatch) {
             tr.setNodeMarkup(details.pos, undefined, {
               ...details.node.attrs,
-              open: true,
-            });
-            dispatch(tr);
-          }
-          return true;
-        },
-
-      closeDetails:
-        () =>
-        ({ state, tr, dispatch }) => {
-          if (!this.options.persist) return false;
-
-          const detailsType = state.schema.nodes['details'];
-          if (!detailsType) return false;
-
-          const details = findParentNode(
-            (node) => node.type === detailsType,
-          )(state.selection);
-
-          if (!details) return false;
-          if (!details.node.attrs['open']) return false; // already closed
-
-          if (dispatch) {
-            tr.setNodeMarkup(details.pos, undefined, {
-              ...details.node.attrs,
-              open: false,
+              open,
             });
             dispatch(tr);
           }

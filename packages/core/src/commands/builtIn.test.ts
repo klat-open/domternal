@@ -11,6 +11,8 @@ import { Blockquote } from '../nodes/Blockquote.js';
 import { BulletList } from '../nodes/BulletList.js';
 import { OrderedList } from '../nodes/OrderedList.js';
 import { ListItem } from '../nodes/ListItem.js';
+import { TaskList } from '../nodes/TaskList.js';
+import { TaskItem } from '../nodes/TaskItem.js';
 import { Bold } from '../marks/Bold.js';
 import { Italic } from '../marks/Italic.js';
 import { Link } from '../marks/Link.js';
@@ -674,6 +676,86 @@ describe('builtIn commands', () => {
       expect(editor.getHTML()).toContain('<ol>');
       expect(editor.getHTML()).not.toContain('<ul>');
     });
+
+    it('cursor stays in correct position after cross-type conversion (taskList → bulletList)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, BulletList, OrderedList, ListItem, TaskList, TaskItem],
+        content: `
+          <ul data-type="taskList">
+            <li data-type="taskItem" data-checked="false">
+              <label contenteditable="false"><input type="checkbox"></label>
+              <div><p>Task text</p></div>
+            </li>
+          </ul>
+        `,
+      });
+
+      // Position cursor inside "Task text"
+      let textPos = 0;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.isText && node.text === 'Task text') textPos = pos + 3; // middle of text
+      });
+      setSelection(editor, textPos);
+
+      const result = editor.commands.toggleList('bulletList', 'listItem');
+      expect(result).toBe(true);
+      expect(editor.state.doc.child(0).type.name).toBe('bulletList');
+      // Cursor should still be inside the text, not collapsed to start/end
+      const { from } = editor.state.selection;
+      const $from = editor.state.doc.resolve(from);
+      expect($from.parent.type.name).toBe('paragraph');
+    });
+
+    it('toggleList on empty list item (cursor in empty textblock)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, BulletList, OrderedList, ListItem],
+        content: '<ul><li><p></p></li></ul>',
+      });
+
+      // Cursor inside the empty paragraph
+      editor.focus('start');
+
+      const result = editor.commands.toggleList('bulletList', 'listItem');
+      expect(result).toBe(true);
+      // Should lift out of the list (since it's already a bulletList)
+      expect(editor.state.doc.child(0).type.name).toBe('paragraph');
+    });
+
+    it('toggleList converts task → ordered with cursor restoration', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, BulletList, OrderedList, ListItem, TaskList, TaskItem],
+        content: `
+          <ul data-type="taskList">
+            <li data-type="taskItem" data-checked="true">
+              <label contenteditable="false"><input type="checkbox" checked></label>
+              <div><p>Alpha</p></div>
+            </li>
+            <li data-type="taskItem" data-checked="false">
+              <label contenteditable="false"><input type="checkbox"></label>
+              <div><p>Beta</p></div>
+            </li>
+          </ul>
+        `,
+      });
+
+      // Position cursor in "Beta"
+      let betaPos = 0;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.isText && node.text === 'Beta') betaPos = pos;
+      });
+      setSelection(editor, betaPos);
+
+      const result = editor.commands.toggleList('orderedList', 'listItem');
+      expect(result).toBe(true);
+      expect(editor.state.doc.child(0).type.name).toBe('orderedList');
+      // Both items should be preserved
+      expect(editor.getText()).toContain('Alpha');
+      expect(editor.getText()).toContain('Beta');
+      // Cursor should still resolve to a paragraph
+      const { from } = editor.state.selection;
+      const $from = editor.state.doc.resolve(from);
+      expect($from.parent.type.name).toBe('paragraph');
+    });
   });
 
   describe('insertContent', () => {
@@ -976,6 +1058,124 @@ describe('builtIn commands', () => {
       const result = editor.chain().focus('end').insertText(' World').run();
       expect(result).toBe(true);
       expect(editor.getText()).toBe('Hello World');
+    });
+  });
+
+  describe('unsetAllMarks', () => {
+    it('removes all marks from selection', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold, Italic],
+        content: '<p><strong><em>Hello</em></strong></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 1, 6);
+
+      const result = editor.commands.unsetAllMarks();
+      expect(result).toBe(true);
+
+      const textNode = editor.state.doc.firstChild!.firstChild!;
+      expect(textNode.marks).toHaveLength(0);
+    });
+
+    it('returns false for empty selection', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold],
+        content: '<p><strong>Hello</strong></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 3);
+
+      const result = editor.commands.unsetAllMarks();
+      expect(result).toBe(false);
+    });
+
+    it('removes multiple mark types at once', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold, Italic],
+        content: '<p><strong><em>Hello</em></strong></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 1, 6);
+      editor.commands.unsetAllMarks();
+
+      // Both bold and italic should be removed
+      const textNode = editor.state.doc.firstChild!.firstChild!;
+      expect(textNode.marks).toHaveLength(0);
+      expect(textNode.text).toBe('Hello');
+    });
+
+    it('can() returns true for non-empty selection', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold],
+        content: '<p><strong>Hello</strong></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 1, 6);
+      expect(editor.can().unsetAllMarks()).toBe(true);
+    });
+
+    it('can() returns false for empty selection', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold],
+        content: '<p><strong>Hello</strong></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 3);
+      expect(editor.can().unsetAllMarks()).toBe(false);
+    });
+
+    it('preserves marks with isFormatting: false (Link)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold, Link],
+        content: '<p><strong><a href="https://example.com">Hello</a></strong></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 1, 6);
+      editor.commands.unsetAllMarks();
+
+      const textNode = editor.state.doc.firstChild!.firstChild!;
+      // Bold removed, Link preserved
+      const markNames = textNode.marks.map(m => m.type.name);
+      expect(markNames).not.toContain('bold');
+      expect(markNames).toContain('link');
+    });
+
+    it('removes marks with isFormatting: true (default)', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold, Italic, Link],
+        content: '<p><em><strong><a href="https://example.com">Hello</a></strong></em></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 1, 6);
+      editor.commands.unsetAllMarks();
+
+      const textNode = editor.state.doc.firstChild!.firstChild!;
+      const markNames = textNode.marks.map(m => m.type.name);
+      expect(markNames).not.toContain('bold');
+      expect(markNames).not.toContain('italic');
+      expect(markNames).toContain('link');
+    });
+
+    it('removes Link when configured with isFormatting: true', () => {
+      const FormattingLink = Link.configure({ isFormatting: true });
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Bold, FormattingLink],
+        content: '<p><strong><a href="https://example.com">Hello</a></strong></p>',
+      });
+      document.body.appendChild(editor.view.dom);
+
+      setSelection(editor, 1, 6);
+      editor.commands.unsetAllMarks();
+
+      const textNode = editor.state.doc.firstChild!.firstChild!;
+      expect(textNode.marks).toHaveLength(0);
     });
   });
 });

@@ -32,6 +32,7 @@ import { Plugin, PluginKey, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import type { EditorState } from 'prosemirror-state';
 import type { Editor } from '../Editor.js';
+import { positionFloatingOnce } from '../utils/positionFloating.js';
 
 export const bubbleMenuPluginKey = new PluginKey('bubbleMenu');
 
@@ -136,59 +137,44 @@ export function createBubbleMenuPlugin(options: CreateBubbleMenuPluginOptions): 
   } = options;
 
   let updateTimeout: ReturnType<typeof setTimeout> | null = null;
+  let cleanupFloating: (() => void) | null = null;
 
   const updatePosition = (view: EditorView, from: number, to: number): void => {
-    // coordsAtPos returns viewport-relative (screen) coordinates
-    const start = view.coordsAtPos(from);
-    const end = view.coordsAtPos(to);
+    cleanupFloating?.();
 
-    const centerX = (start.left + end.left) / 2;
-    const menuRect = element.getBoundingClientRect();
-
-    // Compute offset from the element's offsetParent so positioning
-    // works for both position:fixed and position:absolute elements.
-    const offsetParent = element.offsetParent;
-    const parentRect = offsetParent
-      ? offsetParent.getBoundingClientRect()
-      : { top: 0, left: 0 };
-
-    let top: number;
-    let left: number;
-
-    if (placement === 'top') {
-      top = start.top - menuRect.height - offset[1];
-    } else {
-      top = end.bottom + offset[1];
+    // For NodeSelection (images, HRs, etc.), use the actual DOM element
+    // for precise alignment. coordsAtPos gives paragraph-wide coords
+    // which misaligns the menu for small centered nodes.
+    const sel = view.state.selection;
+    let reference: Element | { getBoundingClientRect: () => DOMRect } | null = null;
+    if ('node' in sel) {
+      const dom = view.nodeDOM(from);
+      if (dom instanceof HTMLElement) reference = dom;
     }
+    reference ??= {
+      getBoundingClientRect: () => {
+        const start = view.coordsAtPos(from);
+        const end = view.coordsAtPos(to);
+        return new DOMRect(
+          start.left,
+          start.top,
+          end.right - start.left,
+          end.bottom - start.top,
+        );
+      },
+    };
 
-    left = centerX - menuRect.width / 2 + offset[0];
+    cleanupFloating = positionFloatingOnce(reference, element, {
+      placement,
+      offsetValue: offset[1],
+    });
 
-    // Viewport boundary checks (in screen coordinates)
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    if (left < 10) left = 10;
-    if (left + menuRect.width > viewportWidth - 10) {
-      left = viewportWidth - menuRect.width - 10;
-    }
-
-    // Flip placement if menu would go off-screen
-    if (placement === 'top' && top < 10) {
-      top = end.bottom + offset[1];
-    } else if (
-      placement === 'bottom' &&
-      top + menuRect.height > viewportHeight - 10
-    ) {
-      top = start.top - menuRect.height - offset[1];
-    }
-
-    // Convert viewport coordinates to offsetParent-relative coordinates
-    element.style.top = `${String(top - parentRect.top)}px`;
-    element.style.left = `${String(left - parentRect.left)}px`;
     element.setAttribute('data-show', '');
   };
 
   const hideMenu = (): void => {
+    cleanupFloating?.();
+    cleanupFloating = null;
     element.removeAttribute('data-show');
   };
 
@@ -250,7 +236,14 @@ export function createBubbleMenuPlugin(options: CreateBubbleMenuPluginOptions): 
       },
     },
 
-    view: () => {
+    view: (editorView) => {
+      // Move element inside .dm-editor (position:relative) so it uses
+      // position:absolute — CSS compositor handles scroll, zero jitter.
+      const editorEl = editorView.dom.closest('.dm-editor');
+      if (editorEl && element.parentElement !== editorEl) {
+        editorEl.appendChild(element);
+      }
+
       const onFocus = (): void => {
         // Re-evaluate after focus (selection may have settled)
         setTimeout(() => {
@@ -291,11 +284,14 @@ export function createBubbleMenuPlugin(options: CreateBubbleMenuPluginOptions): 
             | BubbleMenuPluginState
             | undefined;
 
-          // Skip if nothing changed
+          // Skip if nothing changed — but reposition when the doc changed
+          // while the menu is visible (e.g. image float attribute changed,
+          // the DOM element moved but the selection stayed at the same pos)
           if (
             state?.visible === prevPluginState?.visible &&
             state?.from === prevPluginState?.from &&
-            state?.to === prevPluginState?.to
+            state?.to === prevPluginState?.to &&
+            !(state?.visible && view.state.doc !== prevState.doc)
           ) {
             return;
           }

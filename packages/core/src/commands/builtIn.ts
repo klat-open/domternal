@@ -14,6 +14,7 @@ import type { Attrs, Node as PMNode } from 'prosemirror-model';
 import type { CommandSpec, CommandMap } from '../types/Commands.js';
 import type { FocusPosition, Content } from '../types/index.js';
 import { createDocument } from '../helpers/index.js';
+import { Mark } from '../Mark.js';
 
 /**
  * Options for setContent command
@@ -474,6 +475,43 @@ export const unsetMark: CommandSpec<[markName: string]> =
     return true;
   };
 
+/**
+ * UnsetAllMarks command - removes all formatting marks from the current selection
+ *
+ * Iterates over all mark types in the schema and removes those with
+ * `isFormatting !== false`. Marks like Link that set `isFormatting: false`
+ * are preserved.
+ *
+ * Returns false for empty selections (no range to clear).
+ */
+export const unsetAllMarks: CommandSpec =
+  () =>
+  ({ state, tr, dispatch, editor }) => {
+    const { from, to, empty } = tr.selection;
+
+    if (empty) return false;
+    if (!dispatch) return true;
+
+    // Build set of non-formatting mark names to skip.
+    // Mark extensions with isFormatting: false (e.g. Link) survive clear formatting.
+    const skipMarks = new Set<string>();
+    const mgr = (editor as unknown as { extensionManager: { extensions: readonly unknown[] } }).extensionManager;
+    for (const ext of mgr.extensions) {
+      if (ext instanceof Mark && !ext.isFormatting) {
+        skipMarks.add(ext.name);
+      }
+    }
+
+    for (const markName of Object.keys(state.schema.marks)) {
+      if (!skipMarks.has(markName)) {
+        tr.removeMark(from, to, state.schema.marks[markName]);
+      }
+    }
+    tr.setStoredMarks([]);
+    dispatch(tr);
+    return true;
+  };
+
 // ============================================================================
 // Block Commands
 // ============================================================================
@@ -797,12 +835,18 @@ export const toggleList: CommandSpec<[listNodeName: string, listItemNodeName: st
       // to avoid invalid intermediate state (parent content spec violation)
       const firstChild = listNode.firstChild;
       if (firstChild && firstChild.type !== listItemType) {
+        const cursorOffset = tr.selection.from - otherPos;
         const newItems: PMNode[] = [];
         listNode.forEach((child) => {
           newItems.push(listItemType.create(child.attrs, child.content, child.marks));
         });
         const newList = listType.create(attributes, newItems);
         tr.replaceWith(otherPos, otherPos + listNode.nodeSize, newList);
+        // Restore cursor — replaceWith collapses positions inside the replaced
+        // range to the end, which lands after the list. Re-resolve the same
+        // relative offset inside the new (structurally identical) list.
+        const restored = otherPos + Math.min(cursorOffset, newList.nodeSize - 1);
+        tr.setSelection(TextSelection.near(tr.doc.resolve(restored)));
       } else {
         // Same item type, just change the wrapper
         tr.setNodeMarkup(otherPos, listType, attributes);
@@ -1065,6 +1109,7 @@ export const builtInCommands: CommandMap = {
   toggleMark,
   setMark,
   unsetMark,
+  unsetAllMarks,
   // Block commands
   setBlockType,
   toggleBlockType,
@@ -1097,6 +1142,7 @@ declare module '../types/Commands.js' {
     toggleMark: CommandSpec<[markName: string, attributes?: Attrs]>;
     setMark: CommandSpec<[markName: string, attributes?: Attrs]>;
     unsetMark: CommandSpec<[markName: string]>;
+    unsetAllMarks: CommandSpec;
     setBlockType: CommandSpec<[nodeName: string, attributes?: Attrs]>;
     toggleBlockType: CommandSpec<[nodeName: string, defaultNodeName: string, attributes?: Attrs]>;
     wrapIn: CommandSpec<[nodeName: string, attributes?: Attrs]>;

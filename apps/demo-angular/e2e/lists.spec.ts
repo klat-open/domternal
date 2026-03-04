@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test } from './fixtures.js';
+import { expect, type Page } from '@playwright/test';
 
 const editorSelector = 'domternal-editor .ProseMirror';
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -1563,8 +1564,9 @@ test.describe('Edge cases — Enter splitting', () => {
 
     const item = page.locator(`${editorSelector} li p`);
     await item.click();
-    await page.keyboard.press('Home');
     await page.waitForTimeout(50);
+    await page.keyboard.press('Home');
+    await page.waitForTimeout(100);
 
     await page.keyboard.press('Enter');
     await page.waitForTimeout(150);

@@ -31,6 +31,8 @@ import {
   ICON_COLOR, ICON_ALIGNMENT, ICON_HEADER, ICON_MERGE, ICON_SPLIT,
   ICON_ALIGN_LEFT, ICON_ALIGN_CENTER, ICON_ALIGN_RIGHT,
   ICON_ALIGN_TOP, ICON_ALIGN_MIDDLE, ICON_ALIGN_BOTTOM,
+  ICON_ROW_PLUS_TOP, ICON_ROW_PLUS_BOTTOM, ICON_DELETE_ROW,
+  ICON_COL_PLUS_LEFT, ICON_COL_PLUS_RIGHT, ICON_DELETE_COL,
   CELL_ICON, CELL_COLORS,
 } from './icons.js';
 
@@ -572,23 +574,23 @@ export class TableView implements NodeView {
     dropdown.addEventListener('mouseenter', this.boundCancelHide);
     dropdown.addEventListener('mousedown', (e) => { e.preventDefault(); });
 
-    const items: { label: string; action: () => void }[] =
+    const items: { icon: string; label: string; action: () => void }[] =
       type === 'row'
         ? [
-            { label: 'Insert Row Above', action: () => { this.execRowCmd(addRowBefore); } },
-            { label: 'Insert Row Below', action: () => { this.execRowCmd(addRowAfter); } },
-            { label: 'Delete Row', action: () => { this.execRowCmd(deleteRow); } },
+            { icon: ICON_ROW_PLUS_TOP, label: 'Insert Row Above', action: () => { this.execRowCmd(addRowBefore); } },
+            { icon: ICON_ROW_PLUS_BOTTOM, label: 'Insert Row Below', action: () => { this.execRowCmd(addRowAfter); } },
+            { icon: ICON_DELETE_ROW, label: 'Delete Row', action: () => { this.execRowCmd(deleteRow); } },
           ]
         : [
-            { label: 'Insert Column Left', action: () => { this.execColCmd(addColumnBefore); } },
-            { label: 'Insert Column Right', action: () => { this.execColCmd(addColumnAfter); } },
-            { label: 'Delete Column', action: () => { this.execColCmd(deleteColumn); } },
+            { icon: ICON_COL_PLUS_LEFT, label: 'Insert Column Left', action: () => { this.execColCmd(addColumnBefore); } },
+            { icon: ICON_COL_PLUS_RIGHT, label: 'Insert Column Right', action: () => { this.execColCmd(addColumnAfter); } },
+            { icon: ICON_DELETE_COL, label: 'Delete Column', action: () => { this.execColCmd(deleteColumn); } },
           ];
 
     for (const item of items) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = item.label;
+      btn.innerHTML = `<span class="dm-table-controls-dropdown-icon">${item.icon}</span>${item.label}`;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         item.action();
@@ -634,13 +636,13 @@ export class TableView implements NodeView {
     this.openToolbarDropdown(triggerBtn, 'dm-table-controls-dropdown dm-table-cell-dropdown', (dropdown) => {
       const palette = document.createElement('div');
       palette.className = 'dm-color-palette';
-      palette.style.setProperty('--dm-palette-columns', '5');
+      palette.style.setProperty('--dm-palette-columns', '4');
 
       const resetBtn = document.createElement('button');
       resetBtn.type = 'button';
       resetBtn.className = 'dm-color-palette-reset';
       resetBtn.innerHTML =
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="14" height="14"><path d="M165.66,101.66,139.31,128l26.35,26.34a8,8,0,0,1-11.32,11.32L128,139.31l-26.34,26.35a8,8,0,0,1-11.32-11.32L116.69,128,90.34,101.66a8,8,0,0,1,11.32-11.32L128,116.69l26.34-26.35a8,8,0,0,1,11.32,11.32ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="14" height="14"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm88,104a87.56,87.56,0,0,1-20.41,56.28L71.72,60.41A88,88,0,0,1,216,128ZM40,128A87.56,87.56,0,0,1,60.41,71.72L184.28,195.59A88,88,0,0,1,40,128Z"/></svg>' +
         ' Default';
       resetBtn.addEventListener('click', (e) => {
         e.stopPropagation();

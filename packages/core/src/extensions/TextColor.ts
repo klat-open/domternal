@@ -114,7 +114,7 @@ export const TextColor = Extension.create<TextColorOptions>({
       unsetTextColor:
         () =>
         ({ commands }) => {
-          commands.setMark('textStyle', { color: null });
+          if (!commands.setMark('textStyle', { color: null })) return false;
           commands.removeEmptyTextStyle();
           return true;
         },
@@ -128,12 +128,13 @@ export const TextColor = Extension.create<TextColorOptions>({
       {
         type: 'dropdown',
         name: 'textColor',
-        icon: 'palette',
+        icon: 'textAUnderline',
         label: 'Text Color',
         group: 'textStyle',
         priority: 200,
         layout: 'grid',
         gridColumns: this.options.columns,
+        defaultIndicatorColor: '#000000',
         items: [
           {
             type: 'button' as const,

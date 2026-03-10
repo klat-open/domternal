@@ -524,6 +524,18 @@ export const Link = Mark.create<LinkOptions>({
             if (!dispatch) return true;
             tr.removeMark(range.from, range.to, markType);
           } else {
+            // Check that at least one text node in the selection is in a context that allows links.
+            // This correctly handles CellSelection (multiple ranges) and code blocks (marks: '').
+            const ctx = { hasApplicableText: false };
+            for (const range of ranges) {
+              tr.doc.nodesBetween(range.$from.pos, range.$to.pos, (node, _pos, parent) => {
+                if (node.isText && parent?.type.allowsMarkType(markType)
+                  && !node.marks.some((m) => m.type.excludes(markType) && m.type !== markType)) {
+                  ctx.hasApplicableText = true;
+                }
+              });
+            }
+            if (!ctx.hasApplicableText) return false;
             if (!dispatch) return true;
             // Iterate over selection ranges (handles CellSelection with multiple ranges)
             for (const range of ranges) {

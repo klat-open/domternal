@@ -142,6 +142,24 @@ export interface ToolbarDropdown {
 
   /** Number of columns in grid layout. @default 10 */
   gridColumns?: number;
+
+  /** How to display items in the dropdown panel: icon + text (default), text only, or icon only. */
+  displayMode?: 'icon-text' | 'text' | 'icon';
+
+  /** Default color for the trigger indicator bar when no item is active (grid dropdowns only). */
+  defaultIndicatorColor?: string;
+
+  /** When true, the trigger icon updates to reflect the active sub-item's icon. */
+  dynamicIcon?: boolean;
+
+  /** When true, the trigger shows the active sub-item's label as text instead of an icon. */
+  dynamicLabel?: boolean;
+
+  /** Text shown in trigger when dynamicLabel is true and no item is active. Falls back to icon if not set. */
+  dynamicLabelFallback?: string;
+
+  /** CSS property to read from computed style at cursor when no item is active (e.g. 'font-size', 'font-family'). */
+  computedStyleProperty?: string;
 }
 
 /**
@@ -163,3 +181,32 @@ export interface ToolbarSeparator {
 
 /** Any toolbar item */
 export type ToolbarItem = ToolbarButton | ToolbarDropdown | ToolbarSeparator;
+
+// =============================================================================
+// Layout
+// =============================================================================
+
+/**
+ * A custom dropdown defined in a toolbar layout.
+ *
+ * @example
+ * { dropdown: 'Format', icon: 'textB', items: ['bold', 'italic', 'underline'] }
+ */
+export interface ToolbarLayoutDropdown {
+  /** Label for the dropdown trigger */
+  dropdown: string;
+  /** Icon key for the dropdown trigger */
+  icon: string;
+  /** Item names to include as sub-items */
+  items: string[];
+  /** How to display items in the dropdown panel: icon + text (default), text only, or icon only. */
+  displayMode?: 'icon-text' | 'text' | 'icon';
+}
+
+/**
+ * A single entry in a toolbar layout array.
+ *
+ * - `string` — item name (e.g. `'bold'`) or separator (`'|'`)
+ * - `ToolbarLayoutDropdown` — custom dropdown grouping
+ */
+export type ToolbarLayoutEntry = string | ToolbarLayoutDropdown;

@@ -26,6 +26,7 @@ import type {
   ToolbarControllerEditor,
   IconSet,
   ToolbarGroup,
+  ToolbarLayoutEntry,
 } from '@domternal/core';
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -75,7 +76,9 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
                 [attr.aria-label]="asDropdown(item).label"
                 [title]="asDropdown(item).label"
                 [tabindex]="getFlatIndex(item.name) === focusedIndex() ? 0 : -1"
-                [innerHTML]="getCachedTriggerIcon(asDropdown(item).icon)"
+                [disabled]="isDisabled(asDropdown(item).name)"
+                [attr.data-dropdown]="asDropdown(item).name"
+                [innerHTML]="getDropdownTriggerHtml(asDropdown(item))"
                 (mousedown)="$event.preventDefault()"
                 (click)="onDropdownToggle(asDropdown(item))"
                 (focus)="onButtonFocus(item.name)"
@@ -103,7 +106,7 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
                           class="dm-color-palette-reset"
                           role="menuitem"
                           [attr.aria-label]="sub.label"
-                          [innerHTML]="getCachedItemIcon(sub.icon, sub.label)"
+                          [innerHTML]="getCachedItemContent(sub.icon, sub.label)"
                           (mousedown)="$event.preventDefault()"
                           (click)="onDropdownItemClick(sub)"
                         ></button>
@@ -111,7 +114,8 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
                     }
                   </div>
                 } @else {
-                  <div class="dm-toolbar-dropdown-panel" role="menu">
+                  <div class="dm-toolbar-dropdown-panel" role="menu"
+                       [attr.data-display-mode]="asDropdown(item).displayMode ?? null">
                     @for (sub of asDropdown(item).items; track sub.name) {
                       <button
                         type="button"
@@ -120,9 +124,9 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
                         role="menuitem"
                         [attr.aria-label]="sub.label"
                         [attr.style]="sub.style ?? null"
-                        [innerHTML]="getCachedItemIcon(sub.icon, sub.label)"
+                        [innerHTML]="getCachedItemContent(sub.icon, sub.label, asDropdown(item).displayMode)"
                         (mousedown)="$event.preventDefault()"
-                        (click)="onDropdownItemClick(sub)"
+                        (click)="onDropdownItemClick(sub, $event)"
                       ></button>
                     }
                   </div>
@@ -138,6 +142,7 @@ const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(na
 export class DomternalToolbarComponent implements OnDestroy {
   readonly editor = input.required<Editor>();
   readonly icons = input<IconSet | null>(null);
+  readonly layout = input<ToolbarLayoutEntry[]>();
 
   /** Exposed state signals for template */
   readonly groups = signal<ToolbarGroup[]>([]);
@@ -163,7 +168,6 @@ export class DomternalToolbarComponent implements OnDestroy {
       const editor = this.editor();
       untracked(() => this.setupController(editor));
     });
-
   }
 
   ngOnDestroy(): void {
@@ -183,8 +187,59 @@ export class DomternalToolbarComponent implements OnDestroy {
   }
 
   isDropdownActive(dropdown: ToolbarDropdown): boolean {
+    if (dropdown.layout === 'grid') return false; // color dropdowns use bar indicator instead
+    if (dropdown.dynamicLabel) return false; // label text already communicates state
     this.activeVersion(); // subscribe to changes
     return dropdown.items.some((item) => this.controller?.activeMap.get(item.name) ?? false);
+  }
+
+  /** Returns trigger innerHTML: dynamic icon + caret (+ color indicator for grid dropdowns). */
+  getDropdownTriggerHtml(dropdown: ToolbarDropdown): SafeHtml {
+    this.activeVersion(); // subscribe to changes
+    const activeItem = dropdown.items.find((item) => this.controller?.activeMap.get(item.name));
+
+    if (dropdown.layout === 'grid') {
+      const color = activeItem?.color ?? dropdown.defaultIndicatorColor ?? null;
+      const key = `tr:${dropdown.icon}:${color ?? ''}`;
+      let cached = this.htmlCache.get(key);
+      if (!cached) {
+        let html = this.resolveIconSvg(dropdown.icon) + this.dropdownCaret;
+        if (color) {
+          html += `<span class="dm-toolbar-color-indicator" style="background-color: ${color}"></span>`;
+        }
+        cached = this.sanitizer.bypassSecurityTrustHtml(html);
+        this.htmlCache.set(key, cached);
+      }
+      return cached;
+    }
+
+    // Non-grid dropdown — show active sub-item's label as text
+    if (dropdown.dynamicLabel) {
+      if (activeItem) return this.getCachedTriggerLabel(activeItem.label);
+
+      // Try reading CSS property from DOM (inline or computed depending on property)
+      if (dropdown.computedStyleProperty) {
+        let computed: string | null;
+        if (dropdown.computedStyleProperty === 'font-family') {
+          // Font-family: read ONLY inline style (explicit mark), not computed (browser default)
+          computed = this.getInlineStyleAtCursor(dropdown.computedStyleProperty);
+          if (computed) {
+            const first = computed.split(',')[0].replace(/['"]+/g, '').trim();
+            computed = first || null;
+          }
+        } else {
+          computed = this.getComputedStyleAtCursor(dropdown.computedStyleProperty);
+        }
+        if (computed) return this.getCachedTriggerLabel(computed);
+      }
+
+      if (dropdown.dynamicLabelFallback) {
+        return this.getCachedTriggerLabel(dropdown.dynamicLabelFallback);
+      }
+      return this.getCachedTriggerLabel(dropdown.icon, true);
+    }
+    const icon = dropdown.dynamicIcon && activeItem ? activeItem.icon : dropdown.icon;
+    return this.getCachedTriggerIcon(icon);
   }
 
   /**
@@ -223,6 +278,19 @@ export class DomternalToolbarComponent implements OnDestroy {
     return cached;
   }
 
+  getCachedTriggerLabel(label: string, isIcon?: boolean): SafeHtml {
+    const key = `tl:${label}`;
+    let cached = this.htmlCache.get(key);
+    if (!cached) {
+      const content = isIcon ? this.resolveIconSvg(label) : label;
+      cached = this.sanitizer.bypassSecurityTrustHtml(
+        `<span class="dm-toolbar-trigger-label">${content}</span>` + this.dropdownCaret,
+      );
+      this.htmlCache.set(key, cached);
+    }
+    return cached;
+  }
+
   getCachedTriggerIcon(iconName: string): SafeHtml {
     const key = `t:${iconName}`;
     let cached = this.htmlCache.get(key);
@@ -233,11 +301,20 @@ export class DomternalToolbarComponent implements OnDestroy {
     return cached;
   }
 
-  getCachedItemIcon(iconName: string, label: string): SafeHtml {
-    const key = `d:${iconName}:${label}`;
+  getCachedItemContent(iconName: string, label: string, displayMode?: 'icon-text' | 'text' | 'icon'): SafeHtml {
+    const mode = displayMode ?? 'icon-text';
+    const key = `dc:${iconName}:${label}:${mode}`;
     let cached = this.htmlCache.get(key);
     if (!cached) {
-      cached = this.sanitizer.bypassSecurityTrustHtml(this.resolveIconSvg(iconName) + ' ' + label);
+      let html: string;
+      if (mode === 'text') {
+        html = label;
+      } else if (mode === 'icon') {
+        html = this.resolveIconSvg(iconName);
+      } else {
+        html = this.resolveIconSvg(iconName) + ' ' + label;
+      }
+      cached = this.sanitizer.bypassSecurityTrustHtml(html);
       this.htmlCache.set(key, cached);
     }
     return cached;
@@ -302,11 +379,21 @@ export class DomternalToolbarComponent implements OnDestroy {
     }
   }
 
-  onDropdownItemClick(item: ToolbarButton): void {
+  onDropdownItemClick(item: ToolbarButton, event?: Event): void {
+    // For emitEvent items, use the dropdown trigger as anchor (sub-item gets removed when dropdown closes)
+    let anchor: HTMLElement | undefined;
+    if (item.emitEvent && event?.currentTarget) {
+      const wrapper = (event.currentTarget as HTMLElement).closest('.dm-toolbar-dropdown-wrapper');
+      anchor = wrapper?.querySelector('.dm-toolbar-dropdown-trigger') as HTMLElement | undefined;
+    }
     this.cleanupFloating?.();
     this.cleanupFloating = null;
-    this.controller?.executeCommand(item);
     this.controller?.closeDropdown();
+    if (item.emitEvent) {
+      (this.editor().emit as (e: string, d: unknown) => void)(item.emitEvent, { anchorElement: anchor });
+    } else {
+      this.controller?.executeCommand(item);
+    }
   }
 
   onButtonFocus(name: string): void {
@@ -366,9 +453,11 @@ export class DomternalToolbarComponent implements OnDestroy {
   private setupController(editor: Editor): void {
     this.destroyController();
 
-    this.controller = new ToolbarController(editor as unknown as ToolbarControllerEditor, () => {
-      this.ngZone.run(() => this.syncState());
-    });
+    this.controller = new ToolbarController(
+      editor as unknown as ToolbarControllerEditor,
+      () => this.ngZone.run(() => this.syncState()),
+      this.layout(),
+    );
     this.controller.subscribe();
     this.syncState();
 
@@ -411,6 +500,38 @@ export class DomternalToolbarComponent implements OnDestroy {
 
     // Bump version to trigger isActive() re-evaluation without creating new objects
     this.activeVersion.update(v => v + 1);
+  }
+
+  private getComputedStyleAtCursor(prop: string): string | null {
+    try {
+      const { from } = this.editor().state.selection;
+      const resolved = this.editor().view.domAtPos(from);
+      const el = resolved.node instanceof HTMLElement
+        ? resolved.node
+        : resolved.node.parentElement;
+      if (!el) return null;
+      // Prefer inline style (explicit mark) over computed style (inherited from heading, etc.)
+      return el.style.getPropertyValue(prop)
+        || window.getComputedStyle(el).getPropertyValue(prop)
+        || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Read only inline style — no computed fallback (used for font-family). */
+  private getInlineStyleAtCursor(prop: string): string | null {
+    try {
+      const { from } = this.editor().state.selection;
+      const resolved = this.editor().view.domAtPos(from);
+      const el = resolved.node instanceof HTMLElement
+        ? resolved.node
+        : resolved.node.parentElement;
+      if (!el) return null;
+      return el.style.getPropertyValue(prop) || null;
+    } catch {
+      return null;
+    }
   }
 
   private focusCurrentButton(): void {

@@ -3,7 +3,6 @@ import { expect, type Page } from '@playwright/test';
 
 const editorSelector = 'domternal-editor .ProseMirror';
 const insertTableBtn = 'domternal-toolbar button[aria-label="Insert Table"]';
-const tableOpsDropdown = 'domternal-toolbar button[aria-label="Table"]';
 
 async function setContentAndFocus(page: Page, html: string) {
   await page.evaluate((h) => {
@@ -51,11 +50,28 @@ async function placeCursorInCell(page: Page, cellIndex = 0) {
   await page.waitForTimeout(100);
 }
 
-/** Click a dropdown item by aria-label inside the Table Operations dropdown panel. */
+/** Execute a table operation command via the editor API.
+ *  Maps human-readable labels (from old toolbar dropdown) to editor commands. */
 async function clickTableOp(page: Page, label: string) {
-  await page.locator(tableOpsDropdown).click();
-  await page.waitForTimeout(50);
-  await page.locator(`.dm-toolbar-dropdown-panel button[aria-label="${label}"]`).click();
+  const commandMap: Record<string, string> = {
+    'Add Row Before': 'addRowBefore',
+    'Add Row After': 'addRowAfter',
+    'Delete Row': 'deleteRow',
+    'Add Column Before': 'addColumnBefore',
+    'Add Column After': 'addColumnAfter',
+    'Delete Column': 'deleteColumn',
+    'Toggle Header Row': 'toggleHeaderRow',
+    'Toggle Header Column': 'toggleHeaderColumn',
+    'Delete Table': 'deleteTable',
+  };
+  const cmd = commandMap[label];
+  if (!cmd) throw new Error(`Unknown table operation: ${label}`);
+  await page.evaluate((c) => {
+    const el = document.querySelector('domternal-editor');
+    const ng = (window as any).ng;
+    const comp = ng?.getComponent?.(el);
+    comp?.editor?.commands[c]?.();
+  }, cmd);
   await page.waitForTimeout(100);
 }
 
@@ -201,54 +217,8 @@ test.describe('Table — Rendering', () => {
   });
 });
 
-// =============================================================================
-// Table — Toolbar dropdown
-// =============================================================================
-
-test.describe('Table — Toolbar dropdown', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector(editorSelector);
-  });
-
-  test('Table Operations dropdown is visible in toolbar', async ({ page }) => {
-    await expect(page.locator(tableOpsDropdown)).toBeVisible();
-  });
-
-  test('dropdown opens on click and shows all operation buttons', async ({ page }) => {
-    await page.locator(tableOpsDropdown).click();
-    await page.waitForTimeout(50);
-
-    const panel = page.locator('.dm-toolbar-dropdown-panel');
-    await expect(panel).toBeVisible();
-
-    const labels = [
-      'Add Row Before', 'Add Row After', 'Delete Row',
-      'Add Column Before', 'Add Column After', 'Delete Column',
-      'Toggle Header Row', 'Toggle Header Column', 'Delete Table',
-    ];
-    for (const label of labels) {
-      await expect(panel.locator(`button[aria-label="${label}"]`)).toBeVisible();
-    }
-  });
-
-  test('operations work when cursor is in a table', async ({ page }) => {
-    await setContentAndFocus(page, SIMPLE_TABLE);
-    await placeCursorInCell(page, 0);
-
-    await page.locator(tableOpsDropdown).click();
-    await page.waitForTimeout(50);
-
-    const addRowBtn = page.locator('.dm-toolbar-dropdown-panel button[aria-label="Add Row After"]');
-    await expect(addRowBtn).toBeVisible();
-
-    // Click it and verify a row was added
-    await addRowBtn.click();
-    await page.waitForTimeout(100);
-    const rowCount = await page.locator(`${editorSelector} tr`).count();
-    expect(rowCount).toBe(4);
-  });
-});
+// NOTE: Table operations toolbar dropdown was removed in refactor(table): 6863002.
+// Table operations are now available via row/column handle dropdowns and cell toolbar.
 
 // =============================================================================
 // Table — Row operations
@@ -1161,7 +1131,7 @@ test.describe('Table — Cell toolbar', () => {
 
     // Should have color swatches
     const swatches = dropdown.locator('.dm-color-swatch');
-    expect(await swatches.count()).toBe(10);
+    expect(await swatches.count()).toBe(16);
   });
 
   test('clicking color swatch applies background', async ({ page }) => {
@@ -3594,5 +3564,112 @@ test.describe('Table — Row handle centering on merged cells', () => {
 
     // The two positions must differ (merged cell center is higher)
     expect(Math.abs(mergedHandleCenter - normalHandleCenter)).toBeGreaterThan(10);
+  });
+});
+
+// =============================================================================
+// Table — Toolbar mark active state with empty cells
+// =============================================================================
+
+test.describe('Table — Toolbar marks inactive for empty cell selection', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(editorSelector);
+  });
+
+  /** Create a CellSelection via the editor API. */
+  async function selectCells(page: Page, anchorIdx: number, headIdx: number) {
+    await page.evaluate(({ anchor, head }) => {
+      const el = document.querySelector('domternal-editor');
+      const ng = (window as any).ng;
+      const comp = ng?.getComponent?.(el);
+      if (!comp?.editor) return;
+      const cells: number[] = [];
+      comp.editor.state.doc.descendants((node: any, pos: number) => {
+        if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+          cells.push(pos);
+        }
+      });
+      if (cells[anchor] != null && cells[head] != null) {
+        comp.editor.commands.setCellSelection({ anchorCell: cells[anchor], headCell: cells[head] });
+      }
+    }, { anchor: anchorIdx, head: headIdx });
+    await page.waitForTimeout(200);
+  }
+
+  const markButtons = ['Bold', 'Italic', 'Underline', 'Strikethrough', 'Code'];
+
+  test('mark buttons are NOT active when selecting empty cells in a new row', async ({ page }) => {
+    await setContentAndFocus(page, SIMPLE_TABLE);
+
+    // Add a new row (cells 6-8 are the new empty row)
+    await placeCursorInCell(page, 5); // last cell in table
+    await clickTableOp(page, 'Add Row After');
+
+    // Select cells in the newly added empty row
+    // After adding a row to 3x3, new cells are at indices 9, 10, 11
+    await selectCells(page, 9, 11);
+
+    for (const label of markButtons) {
+      const btn = page.locator(`domternal-toolbar button[aria-label="${label}"]`);
+      if (await btn.count() > 0) {
+        await expect(btn).toHaveAttribute('aria-pressed', 'false');
+      }
+    }
+  });
+
+  test('mark buttons are NOT active when selecting empty cells in a new column', async ({ page }) => {
+    await setContentAndFocus(page, SIMPLE_TABLE);
+
+    // Add a new column
+    await placeCursorInCell(page, 2); // last cell in first row
+    await clickTableOp(page, 'Add Column After');
+
+    // The new column cells are at indices 3, 7, 11 (inserted after each row's last cell)
+    // Select two empty cells from the new column
+    await selectCells(page, 3, 11);
+
+    for (const label of markButtons) {
+      const btn = page.locator(`domternal-toolbar button[aria-label="${label}"]`);
+      if (await btn.count() > 0) {
+        await expect(btn).toHaveAttribute('aria-pressed', 'false');
+      }
+    }
+  });
+
+  test('mark buttons ARE active when selecting cells with fully marked text', async ({ page }) => {
+    await setContentAndFocus(page, '<table><tr><td><strong>A</strong></td><td><strong>B</strong></td></tr></table>');
+
+    await selectCells(page, 0, 1);
+
+    const boldBtn = page.locator('domternal-toolbar button[aria-label="Bold"]');
+    await expect(boldBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('mark buttons are NOT active when only some cells have the mark', async ({ page }) => {
+    await setContentAndFocus(page, '<table><tr><td><strong>A</strong></td><td>B</td></tr></table>');
+
+    await selectCells(page, 0, 1);
+
+    const boldBtn = page.locator('domternal-toolbar button[aria-label="Bold"]');
+    await expect(boldBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('mark buttons stay inactive after adding row and selecting all new cells', async ({ page }) => {
+    await setContentAndFocus(page, TABLE_NO_HEADER);
+
+    // Add a row after the last row
+    await placeCursorInCell(page, 3); // last cell
+    await clickTableOp(page, 'Add Row After');
+
+    // Select only the two new empty cells (indices 4, 5)
+    await selectCells(page, 4, 5);
+
+    for (const label of markButtons) {
+      const btn = page.locator(`domternal-toolbar button[aria-label="${label}"]`);
+      if (await btn.count() > 0) {
+        await expect(btn).toHaveAttribute('aria-pressed', 'false');
+      }
+    }
   });
 });

@@ -24,7 +24,7 @@
  */
 import { Extension } from '../Extension.js';
 import type { CommandSpec } from '../types/Commands.js';
-import type { ToolbarItem } from '../types/Toolbar.js';
+import type { ToolbarButton, ToolbarItem } from '../types/Toolbar.js';
 
 declare module '../types/Commands.js' {
   interface RawCommands {
@@ -35,10 +35,17 @@ declare module '../types/Commands.js' {
 
 export interface FontSizeOptions {
   /**
-   * List of allowed font sizes (e.g., ['12px', '14px', '16px']).
+   * List of font sizes shown in the toolbar dropdown.
+   * Any font size is accepted from pasted HTML regardless of this list.
    * @default ['12px', '14px', '16px', '18px', '24px', '32px']
    */
   fontSizes: string[];
+
+  /**
+   * Show an unset/reset button at the end of the dropdown.
+   * @default false
+   */
+  showReset: boolean;
 }
 
 export const FontSize = Extension.create<FontSizeOptions>({
@@ -47,6 +54,7 @@ export const FontSize = Extension.create<FontSizeOptions>({
   addOptions() {
     return {
       fontSizes: ['12px', '14px', '16px', '18px', '24px', '32px'],
+      showReset: false,
     };
   },
 
@@ -64,14 +72,6 @@ export const FontSize = Extension.create<FontSizeOptions>({
               const fontSize = attributes['fontSize'] as string | null;
               if (!fontSize) return null;
 
-              // Validate size if fontSizes list is provided
-              if (
-                this.options.fontSizes.length > 0 &&
-                !this.options.fontSizes.includes(fontSize)
-              ) {
-                return null;
-              }
-
               return { style: `font-size: ${fontSize}` };
             },
           },
@@ -85,21 +85,13 @@ export const FontSize = Extension.create<FontSizeOptions>({
       setFontSize:
         (fontSize: string) =>
         ({ commands }) => {
-          // Validate size if fontSizes list is provided
-          if (
-            this.options.fontSizes.length > 0 &&
-            !this.options.fontSizes.includes(fontSize)
-          ) {
-            return false;
-          }
-
           return commands.setMark('textStyle', { fontSize });
         },
 
       unsetFontSize:
         () =>
         ({ commands }) => {
-          commands.setMark('textStyle', { fontSize: null });
+          if (!commands.setMark('textStyle', { fontSize: null })) return false;
           commands.removeEmptyTextStyle();
           return true;
         },
@@ -109,33 +101,45 @@ export const FontSize = Extension.create<FontSizeOptions>({
   addToolbarItems(): ToolbarItem[] {
     if (this.options.fontSizes.length === 0) return [];
 
+    const sizes = this.options.fontSizes.includes('16px')
+      ? this.options.fontSizes
+      : ['16px', ...this.options.fontSizes];
+
+    const items: ToolbarButton[] = sizes.map((size, i) => ({
+      type: 'button' as const,
+      name: `fontSize-${size}`,
+      command: 'setFontSize',
+      commandArgs: [size],
+      isActive: { name: 'textStyle', attributes: { fontSize: size } },
+      icon: 'textSize',
+      label: size,
+      priority: 200 - i,
+    }));
+
+    if (this.options.showReset) {
+      items.push({
+        type: 'button' as const,
+        name: 'unsetFontSize',
+        command: 'unsetFontSize',
+        icon: 'textSize',
+        label: '–',
+        priority: 0,
+      });
+    }
+
     return [
       {
         type: 'dropdown',
         name: 'fontSize',
-        icon: 'textIndent',
+        icon: 'textSize',
         label: 'Font Size',
         group: 'textStyle',
         priority: 100,
-        items: [
-          ...this.options.fontSizes.map((size, i) => ({
-            type: 'button' as const,
-            name: `fontSize-${size}`,
-            command: 'setFontSize',
-            commandArgs: [size],
-            isActive: { name: 'textStyle', attributes: { fontSize: size } },
-            icon: 'textIndent',
-            label: size,
-            priority: 200 - i,
-          })),
-          {
-            type: 'button' as const,
-            name: 'unsetFontSize',
-            command: 'unsetFontSize',
-            icon: 'textIndent',
-            label: 'Default',
-          },
-        ],
+        displayMode: 'text',
+        dynamicLabel: true,
+        dynamicLabelFallback: '16px',
+        computedStyleProperty: 'font-size',
+        items,
       },
     ];
   },

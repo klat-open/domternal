@@ -14,7 +14,7 @@
  * controller.destroy();
  */
 
-import type { ToolbarItem, ToolbarButton, ToolbarDropdown } from './types/Toolbar.js';
+import type { ToolbarItem, ToolbarButton, ToolbarDropdown, ToolbarLayoutEntry } from './types/Toolbar.js';
 
 /**
  * Editor interface for ToolbarController.
@@ -93,6 +93,7 @@ export class ToolbarController {
 
   private editor: ToolbarControllerEditor;
   private onChange: () => void;
+  private _layout: ToolbarLayoutEntry[] | null;
   private transactionHandler: (() => void) | null = null;
 
   /** Grouped and sorted toolbar items */
@@ -116,9 +117,10 @@ export class ToolbarController {
   /** Flat list of top-level buttons/dropdowns for keyboard nav */
   private _flatButtons: FlatButton[] = [];
 
-  constructor(editor: ToolbarControllerEditor, onChange: () => void) {
+  constructor(editor: ToolbarControllerEditor, onChange: () => void, layout?: ToolbarLayoutEntry[]) {
     this.editor = editor;
     this.onChange = onChange;
+    this._layout = layout ?? null;
     this.rebuild();
   }
 
@@ -283,10 +285,13 @@ export class ToolbarController {
 
   /**
    * Rebuilds groups and flat button list from editor.toolbarItems.
+   * When a layout is provided, uses layout-based resolution instead of default grouping.
    */
   private rebuild(): void {
     const items = this.editor.toolbarItems;
-    this._groups = this.groupItems(items);
+    this._groups = this._layout
+      ? this.resolveLayout(items, this._layout)
+      : this.groupItems(items);
     this._flatButtons = this.buildFlatList();
     this._focusedIndex = 0;
   }
@@ -323,6 +328,79 @@ export class ToolbarController {
         return pb - pa;
       });
       groups.push({ name, items: groupItems });
+    }
+
+    return groups;
+  }
+
+  /**
+   * Resolves a layout array into ToolbarGroups by looking up registered items by name.
+   * Separators ('|') split items into visual groups.
+   * String entries resolve to existing buttons or dropdowns.
+   * ToolbarLayoutDropdown entries build custom dropdowns from named sub-items.
+   */
+  private resolveLayout(items: ToolbarItem[], layout: ToolbarLayoutEntry[]): ToolbarGroup[] {
+    // Build lookup maps from registered toolbar items
+    const buttonMap = new Map<string, ToolbarButton>();
+    const dropdownMap = new Map<string, ToolbarDropdown>();
+
+    for (const item of items) {
+      if (item.type === 'button') {
+        buttonMap.set(item.name, item);
+      } else if (item.type === 'dropdown') {
+        dropdownMap.set(item.name, item);
+        for (const sub of item.items) {
+          buttonMap.set(sub.name, sub);
+        }
+      }
+    }
+
+    // Walk layout entries, building groups split by '|'
+    const groups: ToolbarGroup[] = [];
+    let current: ToolbarItem[] = [];
+    let groupIdx = 0;
+
+    for (const entry of layout) {
+      if (entry === '|') {
+        if (current.length > 0) {
+          groups.push({ name: `layout-${String(groupIdx++)}`, items: current });
+          current = [];
+        }
+        continue;
+      }
+
+      if (typeof entry === 'string') {
+        const dd = dropdownMap.get(entry);
+        if (dd) {
+          current.push(dd);
+        } else {
+          const btn = buttonMap.get(entry);
+          if (btn) current.push(btn);
+        }
+        continue;
+      }
+
+      // ToolbarLayoutDropdown — build a custom dropdown from named sub-items
+      const subItems: ToolbarButton[] = [];
+      for (const subName of entry.items) {
+        const btn = buttonMap.get(subName);
+        if (btn) subItems.push(btn);
+      }
+      if (subItems.length > 0) {
+        const dd: ToolbarDropdown = {
+          type: 'dropdown',
+          name: `layout-dd-${entry.dropdown}`,
+          icon: entry.icon,
+          label: entry.dropdown,
+          items: subItems,
+        };
+        if (entry.displayMode) dd.displayMode = entry.displayMode;
+        current.push(dd);
+      }
+    }
+
+    if (current.length > 0) {
+      groups.push({ name: `layout-${String(groupIdx)}`, items: current });
     }
 
     return groups;
@@ -368,6 +446,14 @@ export class ToolbarController {
             if (this.checkButtonActive(sub)) changed = true;
             if (this.checkButtonDisabled(sub, canProxy)) changed = true;
           }
+          // Dropdown trigger is disabled when ALL sub-items are disabled
+          const allDisabled = item.items.length > 0
+            && item.items.every(sub => this._disabledMap.get(sub.name));
+          const wasDropdownDisabled = this._disabledMap.get(item.name) ?? false;
+          if (wasDropdownDisabled !== allDisabled) {
+            this._disabledMap.set(item.name, allDisabled);
+            changed = true;
+          }
         }
       }
     }
@@ -384,22 +470,22 @@ export class ToolbarController {
     const wasDisabled = this._disabledMap.get(item.name) ?? false;
     let nowDisabled = false;
 
-    // Buttons with emitEvent are never disabled — they emit an event, not a command.
-    // They still participate in active-state checks (checkButtonActive) because
-    // active state reflects document state (e.g. link button shows active on links).
-    if (!item.emitEvent) {
-      try {
-        if (canProxy) {
-          const canCmd = canProxy[item.command];
-          if (canCmd) {
-            nowDisabled = item.commandArgs?.length
-              ? !canCmd(...item.commandArgs)
-              : !canCmd();
-          }
+    try {
+      if (item.emitEvent) {
+        // emitEvent buttons open a popover — can't do meaningful can() dry-run
+        // because the command needs user-provided args (href, src, etc.).
+        // Instead, check if cursor is in a code block where marks/inserts are blocked.
+        nowDisabled = this.editor.isActive('codeBlock');
+      } else if (canProxy) {
+        const canCmd = canProxy[item.command];
+        if (canCmd) {
+          nowDisabled = item.commandArgs?.length
+            ? !canCmd(...item.commandArgs)
+            : !canCmd();
         }
-      } catch {
-        // Command dry-run may throw (e.g. buggy extension) — treat as enabled
       }
+    } catch {
+      // Command dry-run may throw (e.g. buggy extension) — treat as enabled
     }
 
     if (wasDisabled !== nowDisabled) {

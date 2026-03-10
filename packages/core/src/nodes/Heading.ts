@@ -130,7 +130,7 @@ export const Heading = Node.create<HeadingOptions>({
       name: 'paragraph',
       command: 'setParagraph',
       isActive: 'paragraph',
-      icon: 'paragraph',
+      icon: 'textT',
       label: 'Normal text',
       shortcut: 'Mod-Alt-0',
     };
@@ -144,6 +144,7 @@ export const Heading = Node.create<HeadingOptions>({
         items: [paragraphItem, ...headingItems],
         group: 'blocks',
         priority: 200,
+        dynamicIcon: true,
       },
     ];
   },

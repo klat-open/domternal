@@ -156,12 +156,12 @@ export const Table = Node.create<TableOptions>({
       insertTable:
         (options?: { rows?: number; cols?: number; withHeaderRow?: boolean }) =>
         ({ state, tr, dispatch }) => {
-          // Prevent nesting tables — refuse if cursor is inside a table
+          // Prevent insertion inside tables and code blocks
           const $from = state.selection.$from;
           for (let d = $from.depth; d > 0; d--) {
-            if ($from.node(d).type.name === 'table') {
-              return false;
-            }
+            const node = $from.node(d);
+            if (node.type.name === 'table') return false;
+            if (node.type.spec.code) return false;
           }
 
           const rows = options?.rows ?? 3;
@@ -362,25 +362,6 @@ export const Table = Node.create<TableOptions>({
         label: 'Insert Table',
         group: 'insert',
         priority: 140,
-      },
-      {
-        type: 'dropdown',
-        name: 'tableOperations',
-        icon: 'gridNine',
-        label: 'Table',
-        group: 'table-ops',
-        priority: 100,
-        items: [
-          { type: 'button', name: 'addRowBefore', command: 'addRowBefore', icon: 'rowsPlusTop', label: 'Add Row Before' },
-          { type: 'button', name: 'addRowAfter', command: 'addRowAfter', icon: 'rowsPlusBottom', label: 'Add Row After' },
-          { type: 'button', name: 'deleteRow', command: 'deleteRow', icon: 'rows', label: 'Delete Row' },
-          { type: 'button', name: 'addColumnBefore', command: 'addColumnBefore', icon: 'columnsPlusLeft', label: 'Add Column Before' },
-          { type: 'button', name: 'addColumnAfter', command: 'addColumnAfter', icon: 'columnsPlusRight', label: 'Add Column After' },
-          { type: 'button', name: 'deleteColumn', command: 'deleteColumn', icon: 'columns', label: 'Delete Column' },
-          { type: 'button', name: 'toggleHeaderRow', command: 'toggleHeaderRow', icon: 'squareHalf', label: 'Toggle Header Row' },
-          { type: 'button', name: 'toggleHeaderColumn', command: 'toggleHeaderColumn', icon: 'squareHalfBottom', label: 'Toggle Header Column' },
-          { type: 'button', name: 'deleteTable', command: 'deleteTable', icon: 'trash', label: 'Delete Table' },
-        ],
       },
     ];
   },

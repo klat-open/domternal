@@ -13,7 +13,15 @@
   </div>
 
   @if (editor(); as ed) {
-    <domternal-toolbar [editor]="ed" />
+    <div class="toolbar-mode-toggle">
+      <button [class.active]="!useLayout()" (click)="switchToolbarMode(false)">Default toolbar</button>
+      <button [class.active]="useLayout()" (click)="switchToolbarMode(true)">Custom layout</button>
+    </div>
+    @if (useLayout()) {
+      <domternal-toolbar [editor]="ed" [layout]="toolbarLayout" />
+    } @else {
+      <domternal-toolbar [editor]="ed" />
+    }
   }
 
 
@@ -29,6 +37,7 @@
       <domternal-bubble-menu [editor]="ed" [contexts]="{
         text: ['bold', 'italic', 'underline', 'strike', 'code', '|', 'link'],
         image: ['imageFloatNone', 'imageFloatLeft', 'imageFloatCenter', 'imageFloatRight', '|', 'deleteImage'],
+        table: []
       }" />
       <domternal-emoji-picker [editor]="ed" [emojis]="emojiData" />
       <!--<domternal-floating-menu [editor]="ed">

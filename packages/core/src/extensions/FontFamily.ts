@@ -35,7 +35,8 @@ declare module '../types/Commands.js' {
 
 export interface FontFamilyOptions {
   /**
-   * List of allowed font families.
+   * List of font families shown in the toolbar dropdown.
+   * Any font family is accepted from pasted HTML regardless of this list.
    * @default ['Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Times New Roman', 'Georgia', 'Palatino Linotype', 'Courier New']
    */
   fontFamilies: string[];
@@ -64,14 +65,6 @@ export const FontFamily = Extension.create<FontFamilyOptions>({
               const fontFamily = attributes['fontFamily'] as string | null;
               if (!fontFamily) return null;
 
-              // Validate font if fontFamilies list is provided
-              if (
-                this.options.fontFamilies.length > 0 &&
-                !this.options.fontFamilies.includes(fontFamily)
-              ) {
-                return null;
-              }
-
               const value = fontFamily.includes(' ') ? `'${fontFamily}'` : fontFamily;
               return { style: `font-family: ${value}` };
             },
@@ -86,21 +79,13 @@ export const FontFamily = Extension.create<FontFamilyOptions>({
       setFontFamily:
         (fontFamily: string) =>
         ({ commands }) => {
-          // Validate font if fontFamilies list is provided
-          if (
-            this.options.fontFamilies.length > 0 &&
-            !this.options.fontFamilies.includes(fontFamily)
-          ) {
-            return false;
-          }
-
           return commands.setMark('textStyle', { fontFamily });
         },
 
       unsetFontFamily:
         () =>
         ({ commands }) => {
-          commands.setMark('textStyle', { fontFamily: null });
+          if (!commands.setMark('textStyle', { fontFamily: null })) return false;
           commands.removeEmptyTextStyle();
           return true;
         },
@@ -118,26 +103,20 @@ export const FontFamily = Extension.create<FontFamilyOptions>({
         label: 'Font Family',
         group: 'textStyle',
         priority: 150,
-        items: [
-          ...this.options.fontFamilies.map((font, i) => ({
-            type: 'button' as const,
-            name: `fontFamily-${font}`,
-            command: 'setFontFamily',
-            commandArgs: [font],
-            isActive: { name: 'textStyle', attributes: { fontFamily: font } },
-            icon: 'textAa',
-            label: font,
-            style: `font-family: ${font.includes(' ') ? `'${font}'` : font}`,
-            priority: 200 - i,
-          })),
-          {
-            type: 'button' as const,
-            name: 'unsetFontFamily',
-            command: 'unsetFontFamily',
-            icon: 'textAa',
-            label: 'Default',
-          },
-        ],
+        displayMode: 'text',
+        dynamicLabel: true,
+        computedStyleProperty: 'font-family',
+        items: this.options.fontFamilies.map((font, i) => ({
+          type: 'button' as const,
+          name: `fontFamily-${font}`,
+          command: 'setFontFamily',
+          commandArgs: [font],
+          isActive: { name: 'textStyle', attributes: { fontFamily: font } },
+          icon: 'textAa',
+          label: font,
+          style: `font-family: ${font.includes(' ') ? `'${font}'` : font}`,
+          priority: 200 - i,
+        })),
       },
     ];
   },

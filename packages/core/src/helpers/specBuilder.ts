@@ -45,7 +45,7 @@ export function buildHTMLAttributes(
   attrs: Record<string, unknown>,
   attrSpecs: AttributeSpecs,
 ): Record<string, unknown> {
-  let htmlAttrs: Record<string, unknown> = {};
+  const htmlAttrs: Record<string, unknown> = {};
 
   for (const [name, attrSpec] of Object.entries(attrSpecs)) {
     // Skip if not rendered
@@ -55,7 +55,7 @@ export function buildHTMLAttributes(
     if (attrSpec.renderHTML) {
       const rendered = attrSpec.renderHTML(attrs);
       if (rendered) {
-        htmlAttrs = { ...htmlAttrs, ...rendered };
+        Object.assign(htmlAttrs, rendered);
       }
     } else if (attrs[name] !== undefined && attrs[name] !== null) {
       // Default: use attribute value directly

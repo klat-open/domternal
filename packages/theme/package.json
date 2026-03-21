@@ -1,9 +1,10 @@
 {
   "name": "@domternal/theme",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Default themes and styles for Domternal editor",
-  "author": "Domternal",
+  "author": "https://github.com/ThomasNowHere",
   "license": "MIT",
+  "type": "commonjs",
   "sideEffects": true,
   "types": "index.d.ts",
   "style": "dist/domternal-theme.css",

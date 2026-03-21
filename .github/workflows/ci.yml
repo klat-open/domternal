@@ -40,10 +40,12 @@ jobs:
 
       - name: Validate packages
         run: |
-          for pkg in packages/core packages/extension-table packages/extension-image packages/extension-emoji packages/extension-mention packages/extension-details packages/extension-code-block-lowlight; do
+          for pkg in packages/pm packages/core packages/theme packages/angular packages/extension-table packages/extension-image packages/extension-emoji packages/extension-mention packages/extension-details packages/extension-code-block-lowlight; do
             echo "--- Validating $pkg ---"
             cd "$pkg"
             npx publint
-            npx @arethetypeswrong/cli --pack
+            if [ "$pkg" != "packages/theme" ] && [ "$pkg" != "packages/angular" ]; then
+              npx @arethetypeswrong/cli --pack
+            fi
             cd "$GITHUB_WORKSPACE"
           done

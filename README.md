@@ -45,106 +45,11 @@ const editor = new Editor({
 
 Import only what you need for full control and zero bloat. Use `StarterKit` for a batteries-included setup with headings, lists, code blocks, history, and more.
 
-> **[Try the full Vanilla TS example on StackBlitz](https://stackblitz.com/edit/domternal-vanilla-full-example)** with toolbar, bubble menu, and all extensions.
-
-### With Theme and Toolbar (Vanilla JS/TS)
-
-```bash
-pnpm add @domternal/core @domternal/theme
-```
-
-```html
-<div id="editor" class="dm-editor"></div>
-```
-
-```ts
-import { Editor, StarterKit, defaultIcons } from '@domternal/core';
-import '@domternal/theme';
-
-const editorEl = document.getElementById('editor')!;
-
-// Toolbar
-const toolbar = document.createElement('div');
-toolbar.className = 'dm-toolbar';
-toolbar.innerHTML = `<div class="dm-toolbar-group">
-  <button class="dm-toolbar-button" data-mark="bold">${defaultIcons.textB}</button>
-  <button class="dm-toolbar-button" data-mark="italic">${defaultIcons.textItalic}</button>
-  <button class="dm-toolbar-button" data-mark="underline">${defaultIcons.textUnderline}</button>
-</div>`;
-editorEl.before(toolbar);
-
-// Editor
-const editor = new Editor({
-  element: editorEl,
-  extensions: [StarterKit],
-  content: '<p>Hello world</p>',
-});
-
-// Toggle marks on click (event delegation)
-toolbar.addEventListener('click', (e) => {
-  const btn = (e.target as Element).closest<HTMLButtonElement>('[data-mark]');
-  if (!btn) return;
-  editor.chain().focus().toggleMark(btn.dataset.mark!).run();
-});
-
-// Active state sync
-editor.on('transaction', () => {
-  toolbar.querySelectorAll<HTMLButtonElement>('[data-mark]').forEach((btn) => {
-    btn.classList.toggle('dm-toolbar-button--active', editor.isActive(btn.dataset.mark!));
-  });
-});
-```
-
-`StarterKit` includes 13 nodes, 6 marks, and 7 behavior extensions out of the box. Every extension can be disabled or configured individually.
-
-### Angular
-
-Requires Angular 17.1+. Standalone components with signals, OnPush change detection, reactive forms (`ControlValueAccessor`), and zoneless mode support.
-
-```bash
-pnpm add @domternal/core @domternal/theme @domternal/angular
-```
-
-```ts
-import { Component, signal } from '@angular/core';
-import {
-  DomternalEditorComponent,
-  DomternalToolbarComponent,
-  DomternalBubbleMenuComponent,
-} from '@domternal/angular';
-import { Editor, StarterKit, BubbleMenu } from '@domternal/core';
-
-@Component({
-  selector: 'app-editor',
-  imports: [DomternalEditorComponent, DomternalToolbarComponent, DomternalBubbleMenuComponent],
-  template: `
-    @if (editor(); as ed) {
-      <domternal-toolbar [editor]="ed" />
-    }
-    <domternal-editor
-      [extensions]="extensions"
-      [content]="content"
-      (editorCreated)="editor.set($event)"
-    />
-    @if (editor(); as ed) {
-      <domternal-bubble-menu [editor]="ed" />
-    }
-  `,
-})
-export class EditorComponent {
-  editor = signal<Editor | null>(null);
-  extensions = [StarterKit, BubbleMenu];
-  content = '<p>Hello from Angular!</p>';
-}
-```
-
-Add the theme to your global stylesheet:
-
-```scss
-@use '@domternal/theme';
-```
-
-> **[Try the full Angular example on StackBlitz](https://stackblitz.com/edit/domternal-angular-full-example)** with all extensions, toolbar, and bubble menu.
+> **[Getting Started Guide](https://domternal.dev/v1/getting-started)** - headless core, themed UI with toolbar, and Angular component setup
+>
+> **[StackBlitz (Angular)](https://stackblitz.com/edit/domternal-angular-full-example)** - full Angular example with all extensions, toolbar, and bubble menu
+>
+> **[StackBlitz (Vanilla TS)](https://stackblitz.com/edit/domternal-vanilla-full-example)** - full vanilla example with toolbar, bubble menu, and all extensions
 
 ## Packages
 

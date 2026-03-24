@@ -424,7 +424,7 @@ export const Table = Node.create<TableOptions>({
     return [
       {
         type: 'button',
-        name: 'insertTable',
+        name: 'table',
         command: 'insertTable',
         icon: 'table',
         label: 'Insert Table',

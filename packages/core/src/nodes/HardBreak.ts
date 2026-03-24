@@ -7,6 +7,7 @@
 
 import { Node } from '../Node.js';
 import type { CommandSpec } from '../types/Commands.js';
+import type { ToolbarItem } from '../types/Toolbar.js';
 
 declare module '../types/Commands.js' {
   interface RawCommands {
@@ -57,6 +58,21 @@ export const HardBreak = Node.create<HardBreakOptions>({
           return true;
         },
     };
+  },
+
+  addToolbarItems(): ToolbarItem[] {
+    return [
+      {
+        type: 'button',
+        name: 'hardBreak',
+        command: 'setHardBreak',
+        icon: 'linkBreak',
+        label: 'Hard Break',
+        shortcut: 'Shift-Enter',
+        group: 'insert',
+        priority: 50,
+      },
+    ];
   },
 
   addKeyboardShortcuts() {

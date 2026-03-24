@@ -70,6 +70,7 @@ export function useBubbleMenu(options: UseBubbleMenuOptions) {
   const disabledMapRef = useRef(new Map<string, boolean>());
   const itemMapRef = useRef(new Map<string, ToolbarButton>());
   const bubbleDefaultsRef = useRef(new Map<string, BubbleMenuItem[]>());
+  const resolvedItemsRef = useRef<BubbleMenuItem[]>([]);
 
   useEffect(() => {
     if (!editor || editor.isDestroyed || !menuRef.current) return;
@@ -212,19 +213,40 @@ export function useBubbleMenu(options: UseBubbleMenuOptions) {
     });
     editor.registerPlugin(plugin);
 
+    const setItems = (newItems: BubbleMenuItem[]) => {
+      resolvedItemsRef.current = newItems;
+      setResolvedItems(newItems);
+    };
+
     // Set initial items
     if (contexts) {
-      updateContextItems(editor, contexts, detectContext, resolveNames, getFormatItems, filterBySchema, bubbleDefaults);
+      updateContextItems(editor, contexts, detectContext, resolveNames, getFormatItems, filterBySchema, bubbleDefaults, setItems);
     } else if (items) {
-      setResolvedItems(resolveNames(items));
+      setItems(resolveNames(items));
     } else {
-      setResolvedItems(resolveNames(['bold', 'italic', 'underline']));
+      setItems(resolveNames(['bold', 'italic', 'underline']));
     }
+
+    const updateStates = (ed: Editor) => {
+      let canProxy: Record<string, (...args: unknown[]) => boolean> | null = null;
+      try { canProxy = ed.can() as unknown as Record<string, (...args: unknown[]) => boolean>; } catch {}
+
+      for (const item of resolvedItemsRef.current) {
+        if (item.type === 'separator') continue;
+        activeMapRef.current.set(item.name, ToolbarController.resolveActive(ed as never, item));
+        try {
+          const canCmd = canProxy?.[item.command];
+          disabledMapRef.current.set(item.name, canCmd
+            ? !(item.commandArgs?.length ? canCmd(...item.commandArgs) : canCmd())
+            : false);
+        } catch { disabledMapRef.current.set(item.name, false); }
+      }
+    };
 
     // Transaction handler
     const transactionHandler = () => {
       if (contexts) {
-        updateContextItems(editor, contexts, detectContext, resolveNames, getFormatItems, filterBySchema, bubbleDefaults);
+        updateContextItems(editor, contexts, detectContext, resolveNames, getFormatItems, filterBySchema, bubbleDefaults, setItems);
       }
       updateStates(editor);
       setActiveVersion(v => v + 1);
@@ -249,42 +271,27 @@ export function useBubbleMenu(options: UseBubbleMenuOptions) {
     getFormatItems: () => ToolbarButton[],
     filterBySchema: (ctx: string, items: ToolbarButton[]) => ToolbarButton[],
     defaults: Map<string, BubbleMenuItem[]>,
+    setItems: (items: BubbleMenuItem[]) => void,
   ) {
     const ctx = detectContext(ed.state.selection as unknown as SelectionShape, ctxs);
-    if (!ctx) { setResolvedItems([]); return; }
+    if (!ctx) { setItems([]); return; }
 
     if (ctx in ctxs) {
       const val = ctxs[ctx];
       if (val === null || (Array.isArray(val) && val.length === 0)) {
-        setResolvedItems([]);
+        setItems([]);
         return;
       }
       if (val === true) {
-        setResolvedItems(filterBySchema(ctx, getFormatItems()));
+        setItems(filterBySchema(ctx, getFormatItems()));
       } else if (Array.isArray(val)) {
         const resolved = resolveNames(val);
         const buttons = resolved.filter((i): i is ToolbarButton => i.type !== 'separator');
         const filtered = new Set(filterBySchema(ctx, buttons).map(b => b.name));
-        setResolvedItems(resolved.filter(i => i.type === 'separator' || filtered.has(i.name)));
+        setItems(resolved.filter(i => i.type === 'separator' || filtered.has(i.name)));
       }
     } else {
-      setResolvedItems(defaults.get(ctx) ?? []);
-    }
-  }
-
-  function updateStates(ed: Editor) {
-    let canProxy: Record<string, (...args: unknown[]) => boolean> | null = null;
-    try { canProxy = ed.can() as unknown as Record<string, (...args: unknown[]) => boolean>; } catch {}
-
-    for (const item of resolvedItems) {
-      if (item.type === 'separator') continue;
-      activeMapRef.current.set(item.name, ToolbarController.resolveActive(ed as never, item));
-      try {
-        const canCmd = canProxy?.[item.command];
-        disabledMapRef.current.set(item.name, canCmd
-          ? !(item.commandArgs?.length ? canCmd(...item.commandArgs) : canCmd())
-          : false);
-      } catch { disabledMapRef.current.set(item.name, false); }
+      setItems(defaults.get(ctx) ?? []);
     }
   }
 

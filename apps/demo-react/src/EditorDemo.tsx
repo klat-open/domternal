@@ -1,10 +1,9 @@
-import { useRef, useState } from 'react';
 import {
-  DomternalEditor,
+  useEditor,
+  useEditorState,
   DomternalToolbar,
   DomternalBubbleMenu,
   DomternalEmojiPicker,
-  type DomternalEditorRef,
 } from '@domternal/react';
 import {
   Bold,
@@ -103,8 +102,12 @@ export interface EditorDemoProps {
 }
 
 export function EditorDemo({ useLayout }: EditorDemoProps) {
-  const editorRef = useRef<DomternalEditorRef>(null);
-  const [htmlOutput, setHtmlOutput] = useState('');
+  const { editor, editorRef } = useEditor({
+    extensions,
+    content: DEMO_CONTENT,
+  });
+
+  const { htmlContent } = useEditorState(editor);
 
   const getStyledHtml = (html: string): string => {
     return inlineStyles(html, { codeHighlighter, tableColumnWidths: 'pixel' });
@@ -112,42 +115,35 @@ export function EditorDemo({ useLayout }: EditorDemoProps) {
 
   return (
     <>
-      <DomternalEditor
-        ref={editorRef}
-        extensions={extensions}
-        content={DEMO_CONTENT}
-        onUpdate={() => {
-          if (editorRef.current) {
-            setHtmlOutput(editorRef.current.htmlContent);
-          }
-        }}
-        onCreate={() => {
-          if (editorRef.current) {
-            setHtmlOutput(editorRef.current.htmlContent);
-          }
-        }}
-      >
-        {editorRef.current?.editor && (
-          <>
-            {useLayout ? (
-              <DomternalToolbar editor={editorRef.current.editor} layout={toolbarLayout} />
-            ) : (
-              <DomternalToolbar editor={editorRef.current.editor} />
-            )}
-            <DomternalBubbleMenu
-              editor={editorRef.current.editor}
-              contexts={{ text: ['bold', 'italic', 'underline', 'strike', 'code', '|', 'link'] }}
-            />
-            <DomternalEmojiPicker editor={editorRef.current.editor} emojis={emojis} />
-          </>
-        )}
-      </DomternalEditor>
+      {editor && (
+        <>
+          {useLayout ? (
+            <DomternalToolbar editor={editor} layout={toolbarLayout} />
+          ) : (
+            <DomternalToolbar editor={editor} />
+          )}
+        </>
+      )}
+
+      <div className="dm-editor">
+        <div ref={editorRef} />
+      </div>
+
+      {editor && (
+        <>
+          <DomternalBubbleMenu
+            editor={editor}
+            contexts={{ text: ['bold', 'italic', 'underline', 'strike', 'code', '|', 'link'] }}
+          />
+          <DomternalEmojiPicker editor={editor} emojis={emojis} />
+        </>
+      )}
 
       <h3>HTML Output</h3>
-      <pre className="output">{htmlOutput}</pre>
+      <pre className="output">{htmlContent}</pre>
 
       <h3>Styled HTML Output</h3>
-      <pre className="output-styled">{htmlOutput ? getStyledHtml(htmlOutput) : ''}</pre>
+      <pre className="output-styled">{htmlContent ? getStyledHtml(htmlContent) : ''}</pre>
     </>
   );
 }

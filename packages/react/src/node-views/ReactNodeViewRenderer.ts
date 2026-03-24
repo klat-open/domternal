@@ -103,13 +103,9 @@ class ReactNodeView {
   private render() {
     const contextValue: ReactNodeViewContextValue = {
       onDragStart: (event: DragEvent) => {
-        const view = this.editor.view;
-        const pos = this.getPos();
-        // Set ProseMirror drag data
-        if (view.dragging) {
+        if (this.editor.view.dragging) {
           event.dataTransfer?.setData('text/plain', this.node.textContent);
         }
-        void pos;
       },
       nodeViewContentRef: (el: HTMLElement | null) => {
         if (el && this.contentDOM && !el.contains(this.contentDOM)) {

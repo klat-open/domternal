@@ -56,9 +56,9 @@ function useEditorStateFull(editor: Editor | null): EditorState {
         const html = editor.getHTML();
         const json = editor.getJSON();
         const empty = editor.isEmpty;
-        // Only update if content actually changed
-        if (prev.htmlContent === html && prev.isEmpty === empty) return prev;
-        return { ...prev, htmlContent: html, jsonContent: json, isEmpty: empty };
+        const editable = editor.isEditable;
+        if (prev.htmlContent === html && prev.isEmpty === empty && prev.isEditable === editable) return prev;
+        return { ...prev, htmlContent: html, jsonContent: json, isEmpty: empty, isEditable: editable };
       });
     };
 

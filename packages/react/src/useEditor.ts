@@ -20,8 +20,6 @@ export interface UseEditorOptions {
   editable?: boolean;
   /** Where to autofocus on mount. @default false */
   autofocus?: FocusPosition;
-  /** Set to false for SSR - delays editor creation to useEffect. @default true */
-  immediatelyRender?: boolean;
   /** Output format for content comparison. @default 'html' */
   outputFormat?: 'html' | 'json';
   /** Called when the editor instance is created. */
@@ -44,7 +42,6 @@ export function useEditor(options: UseEditorOptions = {}) {
     content = '',
     editable = true,
     autofocus = false,
-    // immediatelyRender reserved for future SSR support
     outputFormat = 'html',
   } = options;
 

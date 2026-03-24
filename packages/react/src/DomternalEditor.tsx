@@ -13,6 +13,8 @@ export interface DomternalEditorProps extends Omit<UseEditorOptions, 'outputForm
   value?: Content;
   /** Called when content changes (controlled mode). */
   onChange?: (value: string | JSONContent) => void;
+  /** Additional content rendered inside the dm-editor wrapper. */
+  children?: React.ReactNode;
 }
 
 export interface DomternalEditorRef {
@@ -55,6 +57,7 @@ export const DomternalEditor = forwardRef<DomternalEditorRef, DomternalEditorPro
       value,
       onChange,
       content,
+      children,
       ...editorOptions
     } = props;
 
@@ -117,6 +120,7 @@ export const DomternalEditor = forwardRef<DomternalEditorRef, DomternalEditorPro
         <div className={classes}>
           <div ref={editorRef} />
         </div>
+        {children}
       </EditorProvider>
     );
   },

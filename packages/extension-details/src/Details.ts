@@ -121,6 +121,7 @@ export const Details = Node.create<DetailsOptions>({
 
       const toggle = document.createElement('button');
       toggle.type = 'button';
+      toggle.setAttribute('aria-label', 'Toggle details');
       toggle.addEventListener('mousedown', (e) => { e.preventDefault(); });
       dom.append(toggle);
 

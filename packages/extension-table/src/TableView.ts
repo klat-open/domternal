@@ -620,6 +620,7 @@ export class TableView implements NodeView {
     for (const item of items) {
       const btn = document.createElement('button');
       btn.type = 'button';
+      btn.setAttribute('aria-label', item.label);
       btn.innerHTML = `<span class="dm-table-controls-dropdown-icon">${item.icon}</span>${item.label}`;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -669,6 +670,7 @@ export class TableView implements NodeView {
       const resetBtn = document.createElement('button');
       resetBtn.type = 'button';
       resetBtn.className = 'dm-color-palette-reset';
+      resetBtn.setAttribute('aria-label', 'Default color');
       resetBtn.innerHTML =
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="14" height="14"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm88,104a87.56,87.56,0,0,1-20.41,56.28L71.72,60.41A88,88,0,0,1,216,128ZM40,128A87.56,87.56,0,0,1,60.41,71.72L184.28,195.59A88,88,0,0,1,40,128Z"/></svg>' +
         ' Default';
@@ -743,6 +745,7 @@ export class TableView implements NodeView {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'dm-table-align-item' + (active ? ' dm-table-align-item--active' : '');
+    btn.setAttribute('aria-label', label);
     btn.innerHTML = `<span class="dm-table-align-item-icon">${icon}</span><span>${label}</span>`;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { Fragment, useCallback } from 'react';
 import type {
   Editor,
   IconSet,
@@ -109,8 +109,9 @@ export function DomternalToolbar({ editor: editorProp, icons, layout }: Domterna
       onKeyDown={onKeyDown}
     >
       {groups.map((group, gi) => (
-        <div key={group.name} className="dm-toolbar-group" role="group" aria-label={group.name || 'Tools'}>
+        <Fragment key={group.name}>
           {gi > 0 && <div className="dm-toolbar-separator" role="separator" />}
+          <div className="dm-toolbar-group" role="group" aria-label={group.name || 'Tools'}>
           {group.items.map((item: ToolbarItem) => {
             if (item.type === 'button') {
               const btn = item as ToolbarButtonType;
@@ -172,7 +173,8 @@ export function DomternalToolbar({ editor: editorProp, icons, layout }: Domterna
             }
             return null;
           })}
-        </div>
+          </div>
+        </Fragment>
       ))}
     </div>
   );

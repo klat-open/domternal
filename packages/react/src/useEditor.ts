@@ -63,21 +63,8 @@ export function useEditor(options: UseEditorOptions = {}) {
   // Track extensions reference for recreation
   const extensionsRef = useRef(extensions);
 
-  // Create editor
-  useEffect(() => {
-    if (!editorRef.current) return;
-
-    const initialContent = pendingContentRef.current ?? content;
-    pendingContentRef.current = null;
-
-    const ed = new Editor({
-      element: editorRef.current,
-      extensions: [...DEFAULT_EXTENSIONS, ...extensions],
-      content: initialContent,
-      editable,
-      autofocus,
-    });
-
+  /** Wire transaction, focus, blur event handlers to an editor instance. */
+  function wireEvents(ed: Editor) {
     ed.on('transaction', ({ transaction }: TransactionEventProps) => {
       const cbs = callbacksRef.current;
       if (transaction.docChanged) {
@@ -95,7 +82,24 @@ export function useEditor(options: UseEditorOptions = {}) {
     ed.on('blur', ({ event }: FocusEventProps) => {
       callbacksRef.current.onBlur?.({ editor: ed, event });
     });
+  }
 
+  // Create editor
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    const initialContent = pendingContentRef.current ?? content;
+    pendingContentRef.current = null;
+
+    const ed = new Editor({
+      element: editorRef.current,
+      extensions: [...DEFAULT_EXTENSIONS, ...extensions],
+      content: initialContent,
+      editable,
+      autofocus,
+    });
+
+    wireEvents(ed);
     instanceRef.current = ed;
     extensionsRef.current = extensions;
     setEditor(ed);
@@ -103,10 +107,12 @@ export function useEditor(options: UseEditorOptions = {}) {
 
     return () => {
       callbacksRef.current.onDestroy?.();
-      // Save content for potential Strict Mode re-mount
-      if (!ed.isDestroyed) {
-        pendingContentRef.current = ed.getJSON();
-        ed.destroy();
+      // Use instanceRef (not closure ed) so cleanup destroys the current editor,
+      // even if extensions effect recreated it after mount.
+      const current = instanceRef.current;
+      if (current && !current.isDestroyed) {
+        pendingContentRef.current = current.getJSON();
+        current.destroy();
       }
       instanceRef.current = null;
       setEditor(null);
@@ -143,24 +149,7 @@ export function useEditor(options: UseEditorOptions = {}) {
     });
     pendingContentRef.current = null;
 
-    newEd.on('transaction', ({ transaction }: TransactionEventProps) => {
-      const cbs = callbacksRef.current;
-      if (transaction.docChanged) {
-        cbs.onUpdate?.({ editor: newEd });
-      }
-      if (!transaction.docChanged && transaction.selectionSet) {
-        cbs.onSelectionChange?.({ editor: newEd });
-      }
-    });
-
-    newEd.on('focus', ({ event }: FocusEventProps) => {
-      callbacksRef.current.onFocus?.({ editor: newEd, event });
-    });
-
-    newEd.on('blur', ({ event }: FocusEventProps) => {
-      callbacksRef.current.onBlur?.({ editor: newEd, event });
-    });
-
+    wireEvents(newEd);
     instanceRef.current = newEd;
     extensionsRef.current = extensions;
     setEditor(newEd);

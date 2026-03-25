@@ -65,7 +65,7 @@ export function ToolbarDropdownPanel({
           className={`dm-toolbar-dropdown-item${isActive(sub.name) ? ' dm-toolbar-dropdown-item--active' : ''}`}
           role="menuitem"
           aria-label={sub.label}
-          style={sub.style ? { cssText: sub.style } as unknown as React.CSSProperties : undefined}
+          ref={(el: HTMLButtonElement | null) => { if (el && sub.style) el.setAttribute('style', sub.style); }}
           dangerouslySetInnerHTML={{ __html: getCachedItemContent(sub.icon, sub.label, dropdown.displayMode) }}
           onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => onItemClick(sub, e)}

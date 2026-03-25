@@ -6,6 +6,13 @@ const DROPDOWN_CARET = '<svg class="dm-dropdown-caret" width="10" height="10" vi
 
 export function useToolbarIcons(icons?: IconSet | null) {
   const cacheRef = useRef(new Map<string, string>());
+  const prevIconsRef = useRef(icons);
+
+  // Clear cache when icons source changes
+  if (icons !== prevIconsRef.current) {
+    cacheRef.current.clear();
+    prevIconsRef.current = icons;
+  }
 
   const resolveIconSvg = useCallback((name: string): string => {
     if (icons) {

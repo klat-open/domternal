@@ -160,12 +160,16 @@ export function useEditor(options: UseEditorOptions = {}, deps?: DependencyList)
 
   // Create editor on mount
   useEffect(() => {
-    if (!editorRef.current || (isSSR && !immediatelyRender)) return;
+    if (isSSR && !immediatelyRender) return;
+
+    // Use the ref element if available, otherwise create a detached div
+    // (composable pattern: Domternal.Content will adopt the DOM later)
+    const element = editorRef.current ?? document.createElement('div');
 
     const initialContent = pendingContentRef.current ?? content;
     pendingContentRef.current = null;
 
-    createEditorInstance(editorRef.current, initialContent, autofocus);
+    createEditorInstance(element, initialContent, autofocus);
 
     return () => {
       destroyCurrentEditor();
@@ -182,28 +186,30 @@ export function useEditor(options: UseEditorOptions = {}, deps?: DependencyList)
 
   // Recreate editor when extensions change
   useEffect(() => {
-    if (!instanceRef.current || instanceRef.current.isDestroyed || !editorRef.current) return;
+    if (!instanceRef.current || instanceRef.current.isDestroyed) return;
     if (extensions === extensionsRef.current) return;
 
+    const element = instanceRef.current.view.dom.parentElement ?? document.createElement('div');
     destroyCurrentEditor();
     const initialContent = pendingContentRef.current ?? '';
     pendingContentRef.current = null;
-    createEditorInstance(editorRef.current, initialContent, false);
+    createEditorInstance(element, initialContent, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extensions]);
 
   // Recreate editor when deps change
   useEffect(() => {
-    if (!deps || !instanceRef.current || instanceRef.current.isDestroyed || !editorRef.current) return;
+    if (!deps || !instanceRef.current || instanceRef.current.isDestroyed) return;
     // Skip if deps haven't actually changed (initial render)
     if (depsRef.current === deps) return;
     if (depsRef.current && deps.length === depsRef.current.length &&
         deps.every((d, i) => d === depsRef.current![i])) return;
 
+    const element = instanceRef.current.view.dom.parentElement ?? document.createElement('div');
     destroyCurrentEditor();
     const initialContent = pendingContentRef.current ?? '';
     pendingContentRef.current = null;
-    createEditorInstance(editorRef.current, initialContent, false);
+    createEditorInstance(element, initialContent, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps ?? []);
 

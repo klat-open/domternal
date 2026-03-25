@@ -6,6 +6,10 @@ export type { EditorState } from './useEditorState.js';
 export { useCurrentEditor, EditorProvider } from './EditorContext.js';
 export type { EditorProviderProps } from './EditorContext.js';
 
+// Composable component
+export { Domternal } from './Domternal.js';
+export type { DomternalProps } from './Domternal.js';
+
 // Components
 export { DomternalEditor } from './DomternalEditor.js';
 export type { DomternalEditorProps, DomternalEditorRef } from './DomternalEditor.js';
@@ -30,6 +34,10 @@ export { NodeViewContent } from './node-views/NodeViewContent.js';
 export type { NodeViewContentProps } from './node-views/NodeViewContent.js';
 export { useReactNodeView } from './node-views/ReactNodeViewContext.js';
 
-// Re-export commonly used types from core for convenience
+// Re-export commonly used types and utilities from core for convenience
 export { Editor } from '@domternal/core';
 export type { Content, AnyExtension, FocusPosition, JSONContent } from '@domternal/core';
+
+// SSR helpers - work without an editor instance (server-safe)
+export { generateHTML, generateJSON, generateText } from '@domternal/core';
+export type { GenerateHTMLOptions, GenerateJSONOptions, GenerateTextOptions } from '@domternal/core';

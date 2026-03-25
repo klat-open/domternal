@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type DependencyList, useEffect, useRef, useState } from 'react';
 import {
   Editor,
   Document,
@@ -22,6 +22,13 @@ export interface UseEditorOptions {
   autofocus?: FocusPosition;
   /** Output format for content comparison. @default 'html' */
   outputFormat?: 'html' | 'json';
+  /**
+   * Set to false to delay editor creation to useEffect (SSR-safe).
+   * When false, the editor will be null during server-side rendering
+   * and created only after the component mounts in the browser.
+   * @default true
+   */
+  immediatelyRender?: boolean;
   /** Called when the editor instance is created. */
   onCreate?: (editor: Editor) => void;
   /** Called when the document content changes. */
@@ -36,12 +43,42 @@ export interface UseEditorOptions {
   onDestroy?: () => void;
 }
 
-export function useEditor(options: UseEditorOptions = {}) {
+/**
+ * Core hook for creating and managing a Domternal editor instance.
+ *
+ * @param options - Editor configuration
+ * @param deps - Optional dependency array. When any value changes, the editor
+ *   is destroyed and recreated (content is preserved). Useful for dynamic
+ *   configuration that requires a full editor rebuild.
+ *
+ * @example
+ * ```tsx
+ * const { editor, editorRef } = useEditor({ extensions, content });
+ * return <div className="dm-editor"><div ref={editorRef} /></div>;
+ * ```
+ *
+ * @example SSR-safe usage (Next.js)
+ * ```tsx
+ * const { editor, editorRef } = useEditor({
+ *   extensions,
+ *   content,
+ *   immediatelyRender: false,
+ * });
+ * ```
+ *
+ * @example With deps for forced recreation
+ * ```tsx
+ * const { editor, editorRef } = useEditor({ extensions, content }, [locale]);
+ * // Editor is recreated when locale changes
+ * ```
+ */
+export function useEditor(options: UseEditorOptions = {}, deps?: DependencyList) {
   const {
     extensions = [],
     content = '',
     editable = true,
     autofocus = false,
+    immediatelyRender = true,
     outputFormat = 'html',
   } = options;
 
@@ -62,6 +99,9 @@ export function useEditor(options: UseEditorOptions = {}) {
 
   // Track extensions reference for recreation
   const extensionsRef = useRef(extensions);
+
+  // Track deps for recreation
+  const depsRef = useRef(deps);
 
   /** Wire transaction, focus, blur event handlers to an editor instance. */
   function wireEvents(ed: Editor) {
@@ -84,38 +124,51 @@ export function useEditor(options: UseEditorOptions = {}) {
     });
   }
 
-  // Create editor
-  useEffect(() => {
-    if (!editorRef.current) return;
-
-    const initialContent = pendingContentRef.current ?? content;
-    pendingContentRef.current = null;
-
+  /** Create editor and wire events. Returns the new instance. */
+  function createEditorInstance(element: HTMLElement, initialContent: Content, focus: FocusPosition) {
     const ed = new Editor({
-      element: editorRef.current,
+      element,
       extensions: [...DEFAULT_EXTENSIONS, ...extensions],
       content: initialContent,
       editable,
-      autofocus,
+      autofocus: focus,
     });
 
     wireEvents(ed);
     instanceRef.current = ed;
     extensionsRef.current = extensions;
+    depsRef.current = deps;
     setEditor(ed);
     callbacksRef.current.onCreate?.(ed);
+    return ed;
+  }
+
+  /** Destroy current editor, preserving content for recreation. */
+  function destroyCurrentEditor() {
+    const current = instanceRef.current;
+    if (current && !current.isDestroyed) {
+      pendingContentRef.current = current.getJSON();
+      callbacksRef.current.onDestroy?.();
+      current.destroy();
+    }
+    instanceRef.current = null;
+    setEditor(null);
+  }
+
+  // SSR guard: skip creation during server-side rendering
+  const isSSR = typeof window === 'undefined';
+
+  // Create editor on mount
+  useEffect(() => {
+    if (!editorRef.current || (isSSR && !immediatelyRender)) return;
+
+    const initialContent = pendingContentRef.current ?? content;
+    pendingContentRef.current = null;
+
+    createEditorInstance(editorRef.current, initialContent, autofocus);
 
     return () => {
-      callbacksRef.current.onDestroy?.();
-      // Use instanceRef (not closure ed) so cleanup destroys the current editor,
-      // even if extensions effect recreated it after mount.
-      const current = instanceRef.current;
-      if (current && !current.isDestroyed) {
-        pendingContentRef.current = current.getJSON();
-        current.destroy();
-      }
-      instanceRef.current = null;
-      setEditor(null);
+      destroyCurrentEditor();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -129,33 +182,30 @@ export function useEditor(options: UseEditorOptions = {}) {
 
   // Recreate editor when extensions change
   useEffect(() => {
-    const ed = instanceRef.current;
-    if (!ed || ed.isDestroyed || !editorRef.current) return;
-    // Skip initial render (handled by mount effect)
+    if (!instanceRef.current || instanceRef.current.isDestroyed || !editorRef.current) return;
     if (extensions === extensionsRef.current) return;
 
-    pendingContentRef.current = ed.getJSON();
-    callbacksRef.current.onDestroy?.();
-    ed.destroy();
-    instanceRef.current = null;
-    setEditor(null);
-
-    const newEd = new Editor({
-      element: editorRef.current,
-      extensions: [...DEFAULT_EXTENSIONS, ...extensions],
-      content: pendingContentRef.current,
-      editable,
-      autofocus: false,
-    });
+    destroyCurrentEditor();
+    const initialContent = pendingContentRef.current ?? '';
     pendingContentRef.current = null;
-
-    wireEvents(newEd);
-    instanceRef.current = newEd;
-    extensionsRef.current = extensions;
-    setEditor(newEd);
-    callbacksRef.current.onCreate?.(newEd);
+    createEditorInstance(editorRef.current, initialContent, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extensions]);
+
+  // Recreate editor when deps change
+  useEffect(() => {
+    if (!deps || !instanceRef.current || instanceRef.current.isDestroyed || !editorRef.current) return;
+    // Skip if deps haven't actually changed (initial render)
+    if (depsRef.current === deps) return;
+    if (depsRef.current && deps.length === depsRef.current.length &&
+        deps.every((d, i) => d === depsRef.current![i])) return;
+
+    destroyCurrentEditor();
+    const initialContent = pendingContentRef.current ?? '';
+    pendingContentRef.current = null;
+    createEditorInstance(editorRef.current, initialContent, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps ?? []);
 
   // Sync content from outside
   useEffect(() => {

@@ -1,7 +1,14 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ReactNodeViewProvider, type ReactNodeViewContextValue } from './ReactNodeViewContext.js';
-import type { Editor } from '@domternal/core';
+import type { Editor, NodeViewContext } from '@domternal/core';
+
+/** ProseMirror node shape passed to node views. */
+interface PMNode {
+  type: { name: string; spec: { group?: string } };
+  attrs: Record<string, unknown>;
+  textContent: string;
+}
 
 /**
  * Props passed to custom React node view components.
@@ -10,7 +17,7 @@ export interface ReactNodeViewProps {
   /** The editor instance. */
   editor: Editor;
   /** The ProseMirror node being rendered. */
-  node: { type: { name: string; spec: { group?: string } }; attrs: Record<string, unknown>; textContent: string };
+  node: PMNode;
   /** Whether this node is selected via NodeSelection. */
   selected: boolean;
   /** Get the document position of this node. */
@@ -19,6 +26,10 @@ export interface ReactNodeViewProps {
   updateAttributes: (attrs: Record<string, unknown>) => void;
   /** Delete this node from the document. */
   deleteNode: () => void;
+  /** The extension that created this node view (name, options). Injected by core. */
+  extension: { name: string; options: Record<string, unknown> };
+  /** ProseMirror decorations applied to this node. */
+  decorations: unknown[];
 }
 
 export interface ReactNodeViewRendererOptions {
@@ -30,16 +41,11 @@ export interface ReactNodeViewRendererOptions {
   contentDOMElement?: string | null;
 }
 
-interface NodeViewRendererProps {
-  editor: Editor;
-  node: ReactNodeViewProps['node'];
-  getPos: () => number;
-  decorations: unknown[];
-  extension: { options: Record<string, unknown> };
-}
-
 /**
- * Converts a React component into a ProseMirror NodeView renderer.
+ * Converts a React component into a ProseMirror NodeView constructor.
+ *
+ * Returns a function matching ProseMirror's native `(node, view, getPos, decorations)` signature.
+ * The editor and extension context are automatically injected by core via `__domternalContext`.
  *
  * @example
  * ```ts
@@ -49,14 +55,44 @@ interface NodeViewRendererProps {
  *   }
  * });
  * ```
+ *
+ * @example Accessing extension options in the component
+ * ```tsx
+ * function ImageComponent({ node, extension, decorations }: ReactNodeViewProps) {
+ *   const maxWidth = extension.options.maxWidth as number;
+ *   return <NodeViewWrapper><img src={node.attrs.src} style={{ maxWidth }} /></NodeViewWrapper>;
+ * }
+ * ```
  */
 export function ReactNodeViewRenderer(
   component: React.ComponentType<ReactNodeViewProps>,
   options: ReactNodeViewRendererOptions = {},
 ) {
-  return (props: NodeViewRendererProps) => {
-    return new ReactNodeView(component, props, options);
+  // Return ProseMirror-compatible NodeViewConstructor: (node, view, getPos, decorations) => NodeView
+  const constructor = (node: PMNode, _view: unknown, getPos: () => number, decorations: unknown[]) => {
+    // Read context injected by core's ExtensionManager.collectNodeViews()
+    const ctx = (constructor as unknown as { __domternalContext?: NodeViewContext }).__domternalContext;
+    const editor = ctx?.editor as Editor;
+    const extension = ctx?.extension ?? { name: node.type.name, options: {} };
+
+    return new ReactNodeView(component, {
+      editor,
+      node,
+      getPos,
+      decorations,
+      extension,
+    }, options);
   };
+
+  return constructor;
+}
+
+interface ReactNodeViewInit {
+  editor: Editor;
+  node: PMNode;
+  getPos: () => number;
+  decorations: unknown[];
+  extension: { name: string; options: Record<string, unknown> };
 }
 
 class ReactNodeView {
@@ -65,21 +101,25 @@ class ReactNodeView {
   private root: Root;
   private component: React.ComponentType<ReactNodeViewProps>;
   private editor: Editor;
-  private node: ReactNodeViewProps['node'];
+  private node: PMNode;
   private getPos: () => number;
+  private decorations: unknown[];
+  private extension: { name: string; options: Record<string, unknown> };
   private selected = false;
 
   constructor(
     component: React.ComponentType<ReactNodeViewProps>,
-    props: NodeViewRendererProps,
+    init: ReactNodeViewInit,
     options: ReactNodeViewRendererOptions,
   ) {
     this.component = component;
-    this.editor = props.editor;
-    this.node = props.node;
-    this.getPos = props.getPos;
+    this.editor = init.editor;
+    this.node = init.node;
+    this.getPos = init.getPos;
+    this.decorations = init.decorations;
+    this.extension = init.extension;
 
-    const isInline = props.node.type.spec.group === 'inline';
+    const isInline = init.node.type.spec.group === 'inline';
     const tag = options.as ?? (isInline ? 'span' : 'div');
 
     this.dom = document.createElement(tag);
@@ -119,6 +159,8 @@ class ReactNodeView {
       node: this.node,
       selected: this.selected,
       getPos: this.getPos,
+      extension: this.extension,
+      decorations: this.decorations,
       updateAttributes: (attrs) => {
         const pos = this.getPos();
         const { tr } = this.editor.view.state;
@@ -140,9 +182,10 @@ class ReactNodeView {
     );
   }
 
-  update(node: ReactNodeViewProps['node']): boolean {
+  update(node: PMNode, decorations: unknown[]): boolean {
     if (node.type.name !== this.node.type.name) return false;
     this.node = node;
+    this.decorations = decorations;
     this.render();
     return true;
   }

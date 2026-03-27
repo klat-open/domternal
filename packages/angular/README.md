@@ -1,70 +1,35 @@
 # @domternal/angular
 
-Angular components for the Domternal editor: editor, toolbar, bubble menu, floating menu, and emoji picker. Standalone components with signals, OnPush change detection, reactive forms (`ControlValueAccessor`), and zoneless mode support.
+[![Version](https://img.shields.io/npm/v/@domternal/angular.svg)](https://www.npmjs.com/package/@domternal/angular)
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/domternal/domternal/blob/main/LICENSE)
 
-Part of the [Domternal](https://github.com/domternal/domternal) toolkit. Full docs at [domternal.dev](https://domternal.dev).
+A lightweight, extensible rich text editor toolkit built on [ProseMirror](https://prosemirror.net/). Framework-agnostic headless core with first-class **Angular** support. Use it headless with vanilla JS/TS, add the built-in toolbar and theme, or drop in ready-made Angular components. Fully tree-shakeable, import only what you use, unused extensions are stripped from your bundle.
 
-Requires Angular 17.1+.
+**[Website](https://domternal.dev)** · **[Documentation](https://domternal.dev/v1/introduction)** · **[StackBlitz (Vanilla TS)](https://stackblitz.com/edit/domternal-vanilla-full-example)** · **[StackBlitz (Angular)](https://stackblitz.com/edit/domternal-angular-full-example)**
 
-## Installation
+## Features
 
-```bash
-npm install @domternal/core @domternal/theme @domternal/angular
-```
+See [Packages & Bundle Size](https://domternal.dev/v1/packages) for a full breakdown of all packages and what each one includes.
 
-## Quick Start
+- **Headless core** - use with any framework or vanilla JS/TS
+- **Angular components** - editor, toolbar, bubble menu, floating menu, emoji picker (signals, OnPush, zoneless-ready)
+- **57 extensions across 10 packages** - 23 nodes, 9 marks, and 25 behavior extensions
+- **140+ chainable commands** - `editor.chain().focus().toggleBold().run()`
+- **Full table support** - cell merging, column resize, row/column controls, cell toolbar, all free and MIT licensed
+- **Tree-shakeable** - import only what you use, your bundler strips the rest
+- **~38 KB gzipped** (own code), [~108 KB total](https://domternal.dev/v1/packages) with ProseMirror
+- **TypeScript first** - 100% typed, zero `any`
+- **4,200+ tests** - 2,675 unit tests and 1,550 E2E tests across 34 Playwright specs
+- **Light and dark theme** - 70+ CSS custom properties for full visual control
+- **Inline styles export** - `getHTML({ styled: true })` produces inline CSS ready for email clients, CMS, and Google Docs
+- **SSR helpers** - `generateHTML`, `generateJSON`, `generateText` for server-side rendering
 
-```ts
-import { Component, signal } from '@angular/core';
-import {
-  DomternalEditorComponent,
-  DomternalToolbarComponent,
-  DomternalBubbleMenuComponent,
-} from '@domternal/angular';
-import { Editor, StarterKit, BubbleMenu } from '@domternal/core';
+## Documentation
 
-@Component({
-  imports: [DomternalEditorComponent, DomternalToolbarComponent, DomternalBubbleMenuComponent],
-  template: `
-    @if (editor(); as ed) {
-      <domternal-toolbar [editor]="ed" />
-    }
-    <domternal-editor
-      [extensions]="extensions"
-      [content]="content"
-      (editorCreated)="editor.set($event)"
-    />
-    @if (editor(); as ed) {
-      <domternal-bubble-menu [editor]="ed" />
-    }
-  `,
-})
-export class EditorComponent {
-  editor = signal<Editor | null>(null);
-  extensions = [StarterKit, BubbleMenu];
-  content = '<p>Hello from Angular!</p>';
-}
-```
-
-### Global Styles
-
-Add the theme to your global stylesheet to load editor and toolbar styles:
-
-```scss
-@use '@domternal/theme';
-```
-
-### Available Components
-
-| Component | Description |
-|---|---|
-| `<domternal-editor>` | The core editor surface |
-| `<domternal-toolbar>` | Auto-renders toolbar buttons based on provided extensions |
-| `<domternal-bubble-menu>` | Contextual formatting menu on text selection |
-| `<domternal-floating-menu>` | Block-level insertion menu on empty lines |
-| `<domternal-emoji-picker>` | Emoji picker panel for the Emoji extension |
-
-The toolbar and bubble menu components auto-render buttons based on the extensions you provide. No manual button wiring needed.
+- [Getting Started](https://domternal.dev/v1/getting-started) - install and create your first editor
+- [Introduction](https://domternal.dev/v1/introduction) - core concepts, architecture, and design decisions
+- [Packages & Bundle Size](https://domternal.dev/v1/packages) - what each package includes and bundle size breakdown
+- [Blog](https://domternal.dev/blog)
 
 ## License
 

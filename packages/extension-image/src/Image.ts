@@ -502,12 +502,14 @@ export const Image = Node.create<ImageOptions>({
       applyBtn.type = 'button';
       applyBtn.className = 'dm-image-popover-btn dm-image-popover-apply';
       applyBtn.title = 'Insert image';
+      applyBtn.setAttribute('aria-label', 'Insert image');
       applyBtn.innerHTML = defaultIcons['check'] ?? '';
 
       const browseBtn = document.createElement('button');
       browseBtn.type = 'button';
       browseBtn.className = 'dm-image-popover-btn dm-image-popover-browse';
       browseBtn.title = 'Browse files';
+      browseBtn.setAttribute('aria-label', 'Browse files');
       browseBtn.innerHTML = defaultIcons['image'] ?? '';
 
       el.appendChild(urlInput);

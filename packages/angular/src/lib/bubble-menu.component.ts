@@ -68,6 +68,7 @@ interface SchemaShape {
             [class.dm-toolbar-button--active]="isItemActive(item)"
             [disabled]="isItemDisabled(item)"
             [title]="item.label"
+            [attr.aria-label]="item.label"
             [innerHTML]="getCachedIcon(item.icon)"
             (mousedown)="$event.preventDefault()"
             (click)="executeCommand(item)"></button>

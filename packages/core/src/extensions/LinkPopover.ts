@@ -60,12 +60,14 @@ function linkPopoverPlugin({ editor, markType, protocols }: LinkPopoverPluginOpt
   applyBtn.type = 'button';
   applyBtn.className = 'dm-link-popover-btn dm-link-popover-apply';
   applyBtn.title = 'Apply link';
+  applyBtn.setAttribute('aria-label', 'Apply link');
   applyBtn.innerHTML = defaultIcons['check'] ?? '';
 
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'dm-link-popover-btn dm-link-popover-remove';
   removeBtn.title = 'Remove link';
+  removeBtn.setAttribute('aria-label', 'Remove link');
   removeBtn.innerHTML = defaultIcons['linkBreak'] ?? '';
 
   el.appendChild(input);

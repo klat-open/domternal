@@ -59,6 +59,7 @@ const CATEGORY_ICONS: Record<string, string> = {
               class="dm-emoji-picker-tab"
               [class.dm-emoji-picker-tab--active]="activeCategory() === cat"
               [title]="cat"
+              [attr.aria-label]="cat"
               (mousedown)="$event.preventDefault()"
               (click)="scrollToCategory(cat)"
             >{{ categoryIcon(cat) }}</button>
@@ -72,6 +73,7 @@ const CATEGORY_ICONS: Record<string, string> = {
                 type="button"
                 class="dm-emoji-swatch"
                 [title]="formatName(item.name)"
+                [attr.aria-label]="formatName(item.name)"
                 (mousedown)="$event.preventDefault()"
                 (click)="selectEmoji(item)"
               >{{ item.emoji }}</button>
@@ -87,6 +89,7 @@ const CATEGORY_ICONS: Record<string, string> = {
                   type="button"
                   class="dm-emoji-swatch"
                   [title]="formatName(item.name)"
+                  [attr.aria-label]="formatName(item.name)"
                   (mousedown)="$event.preventDefault()"
                   (click)="selectEmoji(item)"
                 >{{ item.emoji }}</button>
@@ -99,6 +102,7 @@ const CATEGORY_ICONS: Record<string, string> = {
                   type="button"
                   class="dm-emoji-swatch"
                   [title]="formatName(item.name)"
+                  [attr.aria-label]="formatName(item.name)"
                   (mousedown)="$event.preventDefault()"
                   (click)="selectEmoji(item)"
                 >{{ item.emoji }}</button>

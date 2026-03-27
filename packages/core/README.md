@@ -1,96 +1,35 @@
 # @domternal/core
 
-Lightweight, framework-agnostic rich text editor engine with 13 nodes, 9 marks, 25 extensions, 112+ chainable commands, and 45 built-in icons.
+[![Version](https://img.shields.io/npm/v/@domternal/core.svg)](https://www.npmjs.com/package/@domternal/core)
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/domternal/domternal/blob/main/LICENSE)
 
-Part of the [Domternal](https://github.com/domternal/domternal) toolkit. Full docs at [domternal.dev](https://domternal.dev).
+A lightweight, extensible rich text editor toolkit built on [ProseMirror](https://prosemirror.net/). Framework-agnostic headless core with first-class **Angular** support. Use it headless with vanilla JS/TS, add the built-in toolbar and theme, or drop in ready-made Angular components. Fully tree-shakeable, import only what you use, unused extensions are stripped from your bundle.
 
-## Installation
+**[Website](https://domternal.dev)** · **[Documentation](https://domternal.dev/v1/introduction)** · **[StackBlitz (Vanilla TS)](https://stackblitz.com/edit/domternal-vanilla-full-example)** · **[StackBlitz (Angular)](https://stackblitz.com/edit/domternal-angular-full-example)**
 
-```bash
-npm install @domternal/core
-```
+## Features
 
-## Quick Start
+See [Packages & Bundle Size](https://domternal.dev/v1/packages) for a full breakdown of all packages and what each one includes.
 
-### Headless (Vanilla JS/TS)
+- **Headless core** - use with any framework or vanilla JS/TS
+- **Angular components** - editor, toolbar, bubble menu, floating menu, emoji picker (signals, OnPush, zoneless-ready)
+- **57 extensions across 10 packages** - 23 nodes, 9 marks, and 25 behavior extensions
+- **140+ chainable commands** - `editor.chain().focus().toggleBold().run()`
+- **Full table support** - cell merging, column resize, row/column controls, cell toolbar, all free and MIT licensed
+- **Tree-shakeable** - import only what you use, your bundler strips the rest
+- **~38 KB gzipped** (own code), [~108 KB total](https://domternal.dev/v1/packages) with ProseMirror
+- **TypeScript first** - 100% typed, zero `any`
+- **4,200+ tests** - 2,675 unit tests and 1,550 E2E tests across 34 Playwright specs
+- **Light and dark theme** - 70+ CSS custom properties for full visual control
+- **Inline styles export** - `getHTML({ styled: true })` produces inline CSS ready for email clients, CMS, and Google Docs
+- **SSR helpers** - `generateHTML`, `generateJSON`, `generateText` for server-side rendering
 
-Import only the extensions you need for full control and zero bloat:
+## Documentation
 
-```ts
-import { Editor, Document, Text, Paragraph, Bold, Italic, Underline } from '@domternal/core';
-
-const editor = new Editor({
-  element: document.getElementById('editor')!,
-  extensions: [Document, Text, Paragraph, Bold, Italic, Underline],
-  content: '<p>Hello <strong>World</strong>!</p>',
-});
-```
-
-### With Theme and Toolbar
-
-Use `StarterKit` for a batteries-included setup, and pair it with `@domternal/theme` for styled UI:
-
-```html
-<div id="editor" class="dm-editor"></div>
-```
-
-```ts
-import { Editor, StarterKit, defaultIcons } from '@domternal/core';
-import '@domternal/theme';
-
-const editorEl = document.getElementById('editor')!;
-
-// Toolbar
-const toolbar = document.createElement('div');
-toolbar.className = 'dm-toolbar';
-toolbar.innerHTML = `<div class="dm-toolbar-group">
-  <button class="dm-toolbar-button" data-mark="bold">${defaultIcons.textB}</button>
-  <button class="dm-toolbar-button" data-mark="italic">${defaultIcons.textItalic}</button>
-  <button class="dm-toolbar-button" data-mark="underline">${defaultIcons.textUnderline}</button>
-</div>`;
-editorEl.before(toolbar);
-
-// Editor
-const editor = new Editor({
-  element: editorEl,
-  extensions: [StarterKit],
-  content: '<p>Hello world</p>',
-});
-
-// Toggle marks on click (event delegation)
-toolbar.addEventListener('click', (e) => {
-  const btn = (e.target as Element).closest<HTMLButtonElement>('[data-mark]');
-  if (!btn) return;
-  editor.chain().focus().toggleMark(btn.dataset.mark!).run();
-});
-
-// Active state sync
-editor.on('transaction', () => {
-  toolbar.querySelectorAll<HTMLButtonElement>('[data-mark]').forEach((btn) => {
-    btn.classList.toggle('dm-toolbar-button--active', editor.isActive(btn.dataset.mark!));
-  });
-});
-```
-
-### StarterKit Contents
-
-Every extension in the kit can be disabled with `false` or configured with options:
-
-```ts
-StarterKit.configure({
-  codeBlock: false,                     // disable an extension
-  heading: { levels: [1, 2, 3, 4] },   // limit heading levels
-  history: { depth: 50 },               // configure undo stack
-  link: { openOnClick: false },         // keep links non-clickable while editing
-  linkPopover: false,                   // disable the built-in link popover
-})
-```
-
-| Category | Included |
-|---|---|
-| **Nodes** | Document, Text, Paragraph, Heading, Blockquote, CodeBlock, BulletList, OrderedList, ListItem, TaskList, TaskItem, HorizontalRule, HardBreak |
-| **Marks** | Bold, Italic, Underline, Strike, Code, Link |
-| **Behaviors** | BaseKeymap, History, Dropcursor, Gapcursor, TrailingNode, ListKeymap, LinkPopover |
+- [Getting Started](https://domternal.dev/v1/getting-started) - install and create your first editor
+- [Introduction](https://domternal.dev/v1/introduction) - core concepts, architecture, and design decisions
+- [Packages & Bundle Size](https://domternal.dev/v1/packages) - what each package includes and bundle size breakdown
+- [Blog](https://domternal.dev/blog)
 
 ## License
 

@@ -6,7 +6,7 @@
  */
 
 import { Node } from '../Node.js';
-import { wrappingInputRule } from '@domternal/pm/inputrules';
+import { wrappingInputRule } from '../helpers/wrappingInputRule.js';
 import type { CommandSpec } from '../types/Commands.js';
 import type { ToolbarItem } from '../types/Toolbar.js';
 import { ListItem } from './ListItem.js';
@@ -110,14 +110,14 @@ export const OrderedList = Node.create<OrderedListOptions>({
 
     return [
       // 1. item (any number followed by . )
-      wrappingInputRule(
-        /^(\d+)\.\s$/,
-        nodeType,
-        (match) => {
+      wrappingInputRule({
+        find: /^(\d+)\.\s$/,
+        type: nodeType,
+        getAttributes: (match) => {
           const num = match[1];
           return { start: num ? parseInt(num, 10) : 1 };
-        }
-      ),
+        },
+      }),
     ];
   },
 });

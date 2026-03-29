@@ -6,7 +6,7 @@
  */
 
 import { Node } from '../Node.js';
-import { textblockTypeInputRule } from '@domternal/pm/inputrules';
+import { textblockTypeInputRule } from '../helpers/textblockTypeInputRule.js';
 import { keymap } from '@domternal/pm/keymap';
 import { Plugin, PluginKey } from '@domternal/pm/state';
 import type { Command as PMCommand } from '@domternal/pm/state';
@@ -217,10 +217,10 @@ export const Heading = Node.create<HeadingOptions>({
 
     const maxLevel = Math.max(...options.levels);
     return [
-      textblockTypeInputRule(
-        new RegExp(`^(#{1,${String(maxLevel)}})\\s$`),
-        nodeType,
-        (match) => {
+      textblockTypeInputRule({
+        find: new RegExp(`^(#{1,${String(maxLevel)}})\\s$`),
+        type: nodeType,
+        getAttributes: (match) => {
           const hashes = match[1];
           if (!hashes) {
             return null;
@@ -231,8 +231,8 @@ export const Heading = Node.create<HeadingOptions>({
             return null;
           }
           return { level };
-        }
-      ),
+        },
+      }),
     ];
   },
 });

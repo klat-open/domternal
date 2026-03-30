@@ -3127,3 +3127,172 @@ test.describe('Edge cases — input rules inside existing list items', () => {
     expect(html).not.toMatch(/<ul>(?![\s\S]*data-type)/);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// MIXED SELECTION: list item(s) + free paragraphs → toggle list
+// ═══════════════════════════════════════════════════════════════════════
+
+const BULLET_THEN_PARAS =
+  '<ul><li><p>first_element_of_list</p></li></ul><p>free_text</p><p>free_text2</p>';
+
+const ORDERED_THEN_PARAS =
+  '<ol><li><p>first_element_of_list</p></li></ol><p>free_text</p><p>free_text2</p>';
+
+const TASK_THEN_PARAS = [
+  '<ul data-type="taskList">',
+  '<li data-type="taskItem" data-checked="false">',
+  '<label contenteditable="false"><input type="checkbox"></label>',
+  '<div><p>first_element_of_list</p></div>',
+  '</li>',
+  '</ul>',
+  '<p>free_text</p>',
+  '<p>free_text2</p>',
+].join('');
+
+/** Select all editor content via Mod-A */
+async function selectAll(page: Page) {
+  await page.locator(editorSelector).click();
+  await page.keyboard.press(`${modifier}+a`);
+  await page.waitForTimeout(100);
+}
+
+test.describe('Mixed selection: bullet list item + free paragraphs', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(editorSelector);
+  });
+
+  test('select all then toggle bullet list wraps all in single flat list', async ({ page }) => {
+    await setContentAndFocus(page, BULLET_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.bullet).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(html).toContain('free_text');
+    // Single flat bullet list, no nesting
+    expect(countOccurrences(html, '<ul>')).toBe(1);
+    expect(countOccurrences(html, '<li>')).toBe(3);
+    expect(html).not.toContain('<ol>');
+  });
+
+  test('select all then toggle ordered list converts and wraps all', async ({ page }) => {
+    await setContentAndFocus(page, BULLET_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.ordered).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, '<ol>')).toBe(1);
+    expect(countOccurrences(html, '<li>')).toBe(3);
+    expect(html).not.toContain('<ul>');
+  });
+
+  test('select all then toggle task list converts and wraps all', async ({ page }) => {
+    await setContentAndFocus(page, BULLET_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.task).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, 'data-type="taskList"')).toBe(1);
+    expect(countOccurrences(html, 'data-type="taskItem"')).toBe(3);
+    expect(html).not.toContain('<ul>');
+    expect(html).not.toContain('<ol>');
+  });
+});
+
+test.describe('Mixed selection: ordered list item + free paragraphs', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(editorSelector);
+  });
+
+  test('select all then toggle ordered list wraps all in single flat list', async ({ page }) => {
+    await setContentAndFocus(page, ORDERED_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.ordered).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, '<ol>')).toBe(1);
+    expect(countOccurrences(html, '<li>')).toBe(3);
+    expect(html).not.toContain('<ul>');
+  });
+
+  test('select all then toggle bullet list converts and wraps all', async ({ page }) => {
+    await setContentAndFocus(page, ORDERED_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.bullet).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, '<ul>')).toBe(1);
+    expect(countOccurrences(html, '<li>')).toBe(3);
+    expect(html).not.toContain('<ol>');
+  });
+
+  test('select all then toggle task list converts and wraps all', async ({ page }) => {
+    await setContentAndFocus(page, ORDERED_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.task).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, 'data-type="taskList"')).toBe(1);
+    expect(countOccurrences(html, 'data-type="taskItem"')).toBe(3);
+    expect(html).not.toContain('<ul>');
+    expect(html).not.toContain('<ol>');
+  });
+});
+
+test.describe('Mixed selection: task list item + free paragraphs', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector(editorSelector);
+  });
+
+  test('select all then toggle task list wraps all in single flat list', async ({ page }) => {
+    await setContentAndFocus(page, TASK_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.task).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, 'data-type="taskList"')).toBe(1);
+    expect(countOccurrences(html, 'data-type="taskItem"')).toBe(3);
+  });
+
+  test('select all then toggle bullet list converts and wraps all', async ({ page }) => {
+    await setContentAndFocus(page, TASK_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.bullet).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, '<ul>')).toBe(1);
+    expect(countOccurrences(html, '<li>')).toBe(3);
+    expect(html).not.toContain('data-type="taskList"');
+  });
+
+  test('select all then toggle ordered list converts and wraps all', async ({ page }) => {
+    await setContentAndFocus(page, TASK_THEN_PARAS);
+    await selectAll(page);
+    await page.locator(btn.ordered).click();
+    await page.waitForTimeout(150);
+
+    const html = await getEditorHTML(page);
+    expect(html).toContain('first_element_of_list');
+    expect(countOccurrences(html, '<ol>')).toBe(1);
+    expect(countOccurrences(html, '<li>')).toBe(3);
+    expect(html).not.toContain('data-type="taskList"');
+  });
+});

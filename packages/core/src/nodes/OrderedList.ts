@@ -6,7 +6,7 @@
  */
 
 import { Node } from '../Node.js';
-import { wrappingInputRule } from '../helpers/wrappingInputRule.js';
+import { wrappingInputRule, notInsideList } from '../helpers/wrappingInputRule.js';
 import type { CommandSpec } from '../types/Commands.js';
 import type { ToolbarItem } from '../types/Toolbar.js';
 import { ListItem } from './ListItem.js';
@@ -113,6 +113,7 @@ export const OrderedList = Node.create<OrderedListOptions>({
       wrappingInputRule({
         find: /^(\d+)\.\s$/,
         type: nodeType,
+        guard: notInsideList,
         getAttributes: (match) => {
           const num = match[1];
           return { start: num ? parseInt(num, 10) : 1 };

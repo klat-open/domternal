@@ -16,6 +16,7 @@ export {
 } from './markInputRule.js';
 export {
   wrappingInputRule,
+  notInsideList,
   type WrappingInputRuleOptions,
 } from './wrappingInputRule.js';
 export {

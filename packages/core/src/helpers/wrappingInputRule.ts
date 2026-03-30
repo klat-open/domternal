@@ -7,6 +7,7 @@
 import { InputRule } from '@domternal/pm/inputrules';
 import { findWrapping, canJoin } from '@domternal/pm/transform';
 import type { NodeType, Node, Attrs } from '@domternal/pm/model';
+import type { EditorState } from '@domternal/pm/state';
 
 export interface WrappingInputRuleOptions {
   /**
@@ -36,6 +37,13 @@ export interface WrappingInputRuleOptions {
    * the same type above the newly wrapped node.
    */
   joinPredicate?: (match: RegExpMatchArray, node: Node) => boolean;
+
+  /**
+   * Optional guard predicate. When provided, the rule only fires if
+   * this returns true. Use this to prevent wrapping in certain contexts
+   * (e.g. don't create a nested list inside an existing list item).
+   */
+  guard?: (state: EditorState) => boolean;
 }
 
 /**
@@ -57,11 +65,12 @@ export interface WrappingInputRuleOptions {
  * });
  */
 export function wrappingInputRule(options: WrappingInputRuleOptions): InputRule {
-  const { find, type, getAttributes = null, joinPredicate, undoable } = options;
+  const { find, type, getAttributes = null, joinPredicate, undoable, guard } = options;
 
   return new InputRule(
     find,
     (state, match, start, end) => {
+      if (guard && !guard(state)) return null;
       const attrs = getAttributes instanceof Function ? getAttributes(match) : getAttributes;
       const tr = state.tr.delete(start, end);
       const $start = tr.doc.resolve(start);
@@ -78,4 +87,18 @@ export function wrappingInputRule(options: WrappingInputRuleOptions): InputRule 
     },
     undoable !== undefined ? { undoable } : {},
   );
+}
+
+/**
+ * Guard predicate that prevents a wrapping input rule from firing
+ * when the cursor is already inside a list item (listItem or taskItem).
+ * Pass as the `guard` option to `wrappingInputRule`.
+ */
+export function notInsideList(state: EditorState): boolean {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    const name = $from.node(d).type.name;
+    if (name === 'listItem' || name === 'taskItem') return false;
+  }
+  return true;
 }

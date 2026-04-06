@@ -6,7 +6,7 @@ const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 const emojiNodeSelector = `${editorSelector} span[data-type="emoji"]`;
 
 /**
- * Sets editor content via the Editor API (Angular component).
+ * Sets editor content via the Editor API (React component).
  * Direct innerHTML doesn't trigger ProseMirror node creation properly.
  */
 async function setEditorContent(page: Page, html: string) {

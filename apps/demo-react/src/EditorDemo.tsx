@@ -114,7 +114,7 @@ export function EditorDemo({ useLayout }: EditorDemoProps) {
 
   const { htmlContent } = useEditorState(editor);
 
-  // Expose editor on window for E2E test access (replaces Angular's ng.getComponent pattern)
+  // Expose editor on window for E2E test access
   useEffect(() => {
     if (editor) {
       (window as unknown as Record<string, unknown>)['__DEMO_EDITOR__'] = editor;
@@ -129,13 +129,7 @@ export function EditorDemo({ useLayout }: EditorDemoProps) {
   return (
     <>
       {editor && (
-        <>
-          {useLayout ? (
-            <DomternalToolbar editor={editor} layout={toolbarLayout} />
-          ) : (
-            <DomternalToolbar editor={editor} />
-          )}
-        </>
+        <DomternalToolbar editor={editor} layout={useLayout ? toolbarLayout : undefined} />
       )}
 
       <div className="dm-editor">

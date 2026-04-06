@@ -4,7 +4,7 @@ import { expect } from '@playwright/test';
 const editorSelector = '.dm-editor .ProseMirror';
 const htmlOutput = 'pre.output';
 
-test.describe('Domternal Angular Editor', () => {
+test.describe('Domternal React Editor', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector(editorSelector);

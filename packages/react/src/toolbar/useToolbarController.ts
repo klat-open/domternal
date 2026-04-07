@@ -134,12 +134,6 @@ export function useToolbarController(
     return controllerRef.current?.getFlatIndex(name) ?? -1;
   }, []);
 
-  const focusCurrentButton = useCallback(() => {
-    const idx = controllerRef.current?.focusedIndex ?? 0;
-    const buttons = toolbarRef.current?.querySelectorAll('.dm-toolbar-button') as NodeListOf<HTMLButtonElement> | undefined;
-    buttons?.[idx]?.focus();
-  }, []);
-
   const handleDropdownToggle = useCallback((dropdown: ToolbarDropdown) => {
     const controller = controllerRef.current;
     if (!controller) return;
@@ -183,7 +177,6 @@ export function useToolbarController(
     isDropdownActive,
     getAriaExpanded,
     getFlatIndex,
-    focusCurrentButton,
     handleDropdownToggle,
     closeDropdown,
     syncState,

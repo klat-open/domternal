@@ -178,8 +178,13 @@ export function useEmojiPicker(editor: Editor | null, emojis: EmojiPickerItem[])
     });
   }, []);
 
+  const activeCategoryRef = useRef(activeCategory);
+  activeCategoryRef.current = activeCategory;
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+
   const onGridScroll = useCallback(() => {
-    if (searchQuery) return;
+    if (searchQueryRef.current) return;
     const grid = pickerRef.current?.querySelector('.dm-emoji-picker-grid') as HTMLElement | null;
     if (!grid) return;
 
@@ -190,10 +195,10 @@ export function useEmojiPicker(editor: Editor | null, emojis: EmojiPickerItem[])
         currentCat = label.getAttribute('data-category') ?? '';
       }
     }
-    if (currentCat && currentCat !== activeCategory) {
+    if (currentCat && currentCat !== activeCategoryRef.current) {
       setActiveCategory(currentCat);
     }
-  }, [searchQuery, activeCategory]);
+  }, []);
 
   return {
     isOpen,

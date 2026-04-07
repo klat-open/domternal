@@ -10,7 +10,7 @@ export function useKeyboardNav(
     const idx = controllerRef.current?.focusedIndex ?? 0;
     const buttons = toolbarRef.current?.querySelectorAll('.dm-toolbar-button') as NodeListOf<HTMLButtonElement> | undefined;
     buttons?.[idx]?.focus();
-  }, [controllerRef, toolbarRef]);
+  }, []); // controllerRef and toolbarRef are stable refs
 
   const onKeyDown = useCallback((event: React.KeyboardEvent) => {
     const controller = controllerRef.current;
@@ -45,7 +45,7 @@ export function useKeyboardNav(
         }
         break;
     }
-  }, [controllerRef, closeDropdown, focusCurrentButton]);
+  }, [closeDropdown, focusCurrentButton]);
 
   return { onKeyDown, focusCurrentButton };
 }

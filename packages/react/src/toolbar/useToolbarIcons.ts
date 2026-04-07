@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import { defaultIcons } from '@domternal/core';
 import type { IconSet, ToolbarButton, ToolbarDropdown } from '@domternal/core';
 
-const DROPDOWN_CARET = '<svg class="dm-dropdown-caret" width="10" height="10" viewBox="0 0 10 10"><path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+export const DROPDOWN_CARET = '<svg class="dm-dropdown-caret" width="10" height="10" viewBox="0 0 10 10"><path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 export function useToolbarIcons(icons?: IconSet | null) {
   const cacheRef = useRef(new Map<string, string>());

@@ -9,7 +9,7 @@ import type {
 } from '@domternal/core';
 import { useCurrentEditor } from '../EditorContext.js';
 import { useToolbarController } from './useToolbarController.js';
-import { useToolbarIcons } from './useToolbarIcons.js';
+import { useToolbarIcons, DROPDOWN_CARET } from './useToolbarIcons.js';
 import { useTooltip } from './useTooltip.js';
 import { useKeyboardNav } from './useKeyboardNav.js';
 import { getComputedStyleAtCursor, getInlineStyleAtCursor } from './useComputedStyle.js';
@@ -68,7 +68,7 @@ export function DomternalToolbar({ editor: editorProp, icons, layout }: Domterna
       return;
     }
     controllerRef.current?.executeCommand(item);
-  }, [editor, controllerRef, closeDropdown]);
+  }, [editor, closeDropdown]);
 
   const onDropdownItemClick = useCallback((item: ToolbarButtonType, event: React.MouseEvent) => {
     if (!editor) return;
@@ -86,14 +86,14 @@ export function DomternalToolbar({ editor: editorProp, icons, layout }: Domterna
     } else {
       controllerRef.current?.executeCommand(item);
     }
-  }, [editor, controllerRef, closeDropdown]);
+  }, [editor, closeDropdown]);
 
   const onButtonFocus = useCallback((name: string) => {
     const index = controllerRef.current?.getFlatIndex(name) ?? -1;
     if (index >= 0) {
       controllerRef.current?.setFocusedIndex(index);
     }
-  }, [controllerRef]);
+  }, []);
 
   // Force re-read of activeVersion in render to subscribe to state changes
   void activeVersion;
@@ -149,7 +149,7 @@ export function DomternalToolbar({ editor: editorProp, icons, layout }: Domterna
                 }
                 if (computed) {
                   // Re-generate trigger with computed value
-                  triggerHtml = `<span class="dm-toolbar-trigger-label">${computed}</span><svg class="dm-dropdown-caret" width="10" height="10" viewBox="0 0 10 10"><path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+                  triggerHtml = `<span class="dm-toolbar-trigger-label">${computed}</span>${DROPDOWN_CARET}`;
                 }
               }
 

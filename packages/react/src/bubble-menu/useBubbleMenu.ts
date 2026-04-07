@@ -296,12 +296,10 @@ export function useBubbleMenu(options: UseBubbleMenuOptions) {
   }
 
   const isItemActive = (item: ToolbarButton): boolean => {
-    void activeVersion;
     return activeMapRef.current.get(item.name) ?? false;
   };
 
   const isItemDisabled = (item: ToolbarButton): boolean => {
-    void activeVersion;
     return disabledMapRef.current.get(item.name) ?? false;
   };
 

@@ -1,6 +1,6 @@
-# @domternal/angular
+# @domternal/react
 
-[![Version](https://img.shields.io/npm/v/@domternal/angular.svg)](https://www.npmjs.com/package/@domternal/angular)
+[![Version](https://img.shields.io/npm/v/@domternal/react.svg)](https://www.npmjs.com/package/@domternal/react)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/domternal/domternal/blob/main/LICENSE)
 
 A lightweight, extensible rich text editor toolkit built on <u>[ProseMirror](https://prosemirror.net/)</u>. Framework-agnostic headless core with first-class Angular and React support.  

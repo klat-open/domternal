@@ -227,7 +227,14 @@ export class DomternalEmojiPickerComponent implements OnDestroy {
       const label = grid.querySelector(`[data-category="${cat}"]`) as HTMLElement | null;
       if (label) {
         // Use manual scrollTop instead of scrollIntoView to avoid scrolling the page
-        grid.scrollTo({ top: label.offsetTop - grid.offsetTop, behavior: 'smooth' });
+        grid.scrollTo({ top: label.offsetTop - grid.offsetTop });
+        // Focus first emoji swatch after scroll completes
+        setTimeout(() => {
+          const firstSwatch = label.nextElementSibling;
+          if (firstSwatch instanceof HTMLElement && firstSwatch.classList.contains('dm-emoji-swatch')) {
+            firstSwatch.focus();
+          }
+        }, 50);
       }
     });
   }
@@ -238,8 +245,15 @@ export class DomternalEmojiPickerComponent implements OnDestroy {
     const swatches = Array.from(grid.querySelectorAll('.dm-emoji-swatch')) as HTMLElement[];
     if (!swatches.length) return;
     const current = document.activeElement as HTMLElement;
-    const idx = swatches.indexOf(current);
-    if (idx === -1) return;
+    let idx = swatches.indexOf(current);
+    if (idx === -1) {
+      // Focus is on grid container, not a swatch — enter the grid
+      if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) {
+        event.preventDefault();
+        swatches[0]?.focus();
+      }
+      return;
+    }
     const cols = 8;
     let next = idx;
     switch (event.key) {

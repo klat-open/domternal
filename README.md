@@ -10,20 +10,21 @@ A lightweight, extensible rich text editor toolkit built on [ProseMirror](https:
 
 **[Website](https://domternal.dev)** · **[Getting Started](https://domternal.dev/v1/getting-started)** · **[Packages & Bundle Size](https://domternal.dev/v1/packages)**
 
-**[StackBlitz (Angular)](https://stackblitz.com/edit/domternal-angular-full-example)** · **[StackBlitz (React)](https://stackblitz.com/edit/domternal-react-full-example)** · **[StackBlitz (Vanilla TS)](https://stackblitz.com/edit/domternal-vanilla-full-example)**
+**[StackBlitz (Angular)](https://stackblitz.com/edit/domternal-angular-full-example)** · **[StackBlitz (React)](https://stackblitz.com/edit/domternal-react-full-example)** · **[StackBlitz (Vue)](https://stackblitz.com/edit/domternal-vue-full-example)** · **[StackBlitz (Vanilla TS)](https://stackblitz.com/edit/domternal-vanilla-full-example)**
 
 ## Features
 
 - **Headless core** - use with any framework or vanilla JS/TS
 - **Angular components** - editor, toolbar, bubble menu, floating menu, emoji picker (signals, OnPush, zoneless-ready)
 - **React components** - composable `Domternal` component, toolbar, bubble menu, floating menu, emoji picker, custom node views (React 18+)
-- **57 extensions across 11 packages** - 23 nodes, 9 marks, and 25 behavior extensions
+- **Vue components** - composable `Domternal` component, `useEditor`/`useEditorState` composables, toolbar, bubble menu, floating menu, emoji picker, custom node views (Vue 3.3+)
+- **57 extensions across 12 packages** - 23 nodes, 9 marks, and 25 behavior extensions
 - **140+ chainable commands** - `editor.chain().focus().toggleBold().run()`
 - **Full table support** - cell merging, column resize, row/column controls, cell toolbar, all free and MIT licensed
 - **Tree-shakeable** - import only what you use, your bundler strips the rest
 - **~38 KB gzipped** (own code), [~108 KB total](https://domternal.dev/v1/packages) with ProseMirror
 - **TypeScript first** - 100% typed, zero `any`
-- **6,400+ tests** - 2,677 unit tests and 3,793 E2E tests across 80 Playwright specs
+- **8,500+ tests** - 2,677 unit tests and 5,800+ E2E tests across 120+ Playwright specs
 - **Light and dark theme** - 70+ CSS custom properties for full visual control
 - **Inline styles export** - `getHTML({ styled: true })` produces inline CSS ready for email clients, CMS, and Google Docs
 - **SSR helpers** - `generateHTML`, `generateJSON`, `generateText` for server-side rendering
@@ -48,11 +49,13 @@ const editor = new Editor({
 
 Import only what you need for full control and zero bloat. Use `StarterKit` for a batteries-included setup with headings, lists, code blocks, history, and more.
 
-> **[Getting Started Guide](https://domternal.dev/v1/getting-started)** - headless core, themed UI with toolbar, and Angular/React component setup
+> **[Getting Started Guide](https://domternal.dev/v1/getting-started)** - headless core, themed UI with toolbar, and Angular/React/Vue component setup
 >
 > **[StackBlitz (Angular)](https://stackblitz.com/edit/domternal-angular-full-example)** - full Angular example with all extensions, toolbar, and bubble menu
 >
 > **[StackBlitz (React)](https://stackblitz.com/edit/domternal-react-full-example)** - full React example with composable components, toolbar, and bubble menu
+>
+> **[StackBlitz (Vue)](https://stackblitz.com/edit/domternal-vue-full-example)** - full Vue example with composable components, toolbar, and bubble menu
 >
 > **[StackBlitz (Vanilla TS)](https://stackblitz.com/edit/domternal-vanilla-full-example)** - full vanilla example with toolbar, bubble menu, and all extensions
 
@@ -64,6 +67,7 @@ Import only what you need for full control and zero bloat. Use `StarterKit` for 
 | [`@domternal/theme`](https://www.npmjs.com/package/@domternal/theme) | Light and dark themes with 70+ CSS custom properties |
 | [`@domternal/angular`](https://www.npmjs.com/package/@domternal/angular) | 5 Angular components: editor, toolbar, bubble menu, floating menu, emoji picker |
 | [`@domternal/react`](https://www.npmjs.com/package/@domternal/react) | React 18+ wrapper: composable component, toolbar, bubble menu, floating menu, emoji picker, node views |
+| [`@domternal/vue`](https://www.npmjs.com/package/@domternal/vue) | Vue 3.3+ wrapper: composable component, composables, toolbar, bubble menu, floating menu, emoji picker, node views |
 | [`@domternal/pm`](https://www.npmjs.com/package/@domternal/pm) | ProseMirror re-exports (state, view, model, transform, commands, keymap, history, tables, and more) |
 | [`@domternal/extension-table`](https://www.npmjs.com/package/@domternal/extension-table) | Tables with 18 commands: merge, split, resize, cell styling, row/column controls |
 | [`@domternal/extension-image`](https://www.npmjs.com/package/@domternal/extension-image) | Image with paste/drop upload, URL input, XSS protection, bubble menu |

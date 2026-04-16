@@ -1,8 +1,12 @@
-import { defineComponent, h, ref, watchEffect } from 'vue';
+import { defineComponent, h, ref, watch, watchEffect } from 'vue';
 import type { PropType } from 'vue';
 import type { AnyExtension, Content, FocusPosition } from '@domternal/core';
 import { useEditor, type UseEditorOptions } from './useEditor.js';
 import { provideEditor, useCurrentEditor } from './EditorContext.js';
+import { DomternalToolbar } from './toolbar/DomternalToolbar.js';
+import { DomternalBubbleMenu } from './bubble-menu/DomternalBubbleMenu.js';
+import { DomternalFloatingMenu } from './DomternalFloatingMenu.js';
+import { DomternalEmojiPicker } from './emoji-picker/DomternalEmojiPicker.js';
 
 export interface DomternalProps extends UseEditorOptions {
   // All UseEditorOptions props are inherited
@@ -63,6 +67,14 @@ export const Domternal = defineComponent({
 
     provideEditor(editor);
 
+    watch(
+      () => props.editable,
+      (newEditable) => {
+        const ed = editor.value;
+        if (ed && !ed.isDestroyed) ed.setEditable(newEditable);
+      },
+    );
+
     return () => slots['default']?.();
   },
 }) as ReturnType<typeof defineComponent> & {
@@ -115,4 +127,7 @@ const DomternalLoading = defineComponent({
 
 Domternal.Content = DomternalContent;
 Domternal.Loading = DomternalLoading;
-// Toolbar, BubbleMenu, FloatingMenu, EmojiPicker are assigned in index.ts
+Domternal.Toolbar = DomternalToolbar;
+Domternal.BubbleMenu = DomternalBubbleMenu;
+Domternal.FloatingMenu = DomternalFloatingMenu;
+Domternal.EmojiPicker = DomternalEmojiPicker;

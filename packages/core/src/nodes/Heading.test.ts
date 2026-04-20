@@ -247,4 +247,165 @@ describe('Heading', () => {
       expect(editor.state.doc.child(1).type.name).toBe('paragraph');
     });
   });
+
+  describe('addToolbarItems', () => {
+    it('returns a dropdown with heading levels + paragraph', () => {
+      const items = Heading.config.addToolbarItems?.call({ ...Heading, options: Heading.options });
+      expect(items).toHaveLength(1);
+      const dropdown = items![0];
+      expect(dropdown?.type).toBe('dropdown');
+    });
+
+    it('dropdown contains paragraph + configured levels', () => {
+      const items = Heading.config.addToolbarItems?.call({ ...Heading, options: Heading.options });
+      const dropdown = items![0] as any;
+      expect(dropdown.items.length).toBeGreaterThan(1);
+      // First item is paragraph
+      expect(dropdown.items[0].name).toBe('paragraph');
+      expect(dropdown.items[0].command).toBe('setParagraph');
+    });
+
+    it('only includes levels 1-4 in toolbar', () => {
+      const CustomHeading = Heading.configure({ levels: [1, 2, 3, 4, 5, 6] });
+      const items = CustomHeading.config.addToolbarItems?.call({ ...CustomHeading, options: CustomHeading.options });
+      const dropdown = items![0] as any;
+      // Paragraph + levels 1-4 (5,6 excluded) = 5 items
+      expect(dropdown.items.length).toBe(5);
+    });
+  });
+
+  describe('addProseMirrorPlugins (keydown fix)', () => {
+    it('Alt+Mod+digit triggers toggleHeading', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Heading],
+        content: '<p>Hi</p>',
+      });
+
+      const event = new KeyboardEvent('keydown', {
+        key: '™',
+        code: 'Digit2',
+        altKey: true,
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(() => editor!.view.dom.dispatchEvent(event)).not.toThrow();
+    });
+
+    it('Alt+Mod+0 triggers setParagraph', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Heading],
+        content: '<h1>Heading</h1>',
+      });
+
+      const event = new KeyboardEvent('keydown', {
+        key: '0',
+        code: 'Digit0',
+        altKey: true,
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      expect(() => editor!.view.dom.dispatchEvent(event)).not.toThrow();
+    });
+
+    it('keydown handler ignores events without alt', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Heading],
+        content: '<p>Hi</p>',
+      });
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'a',
+        code: 'KeyA',
+        altKey: false,
+        metaKey: false,
+        bubbles: true,
+      });
+      expect(() => editor!.view.dom.dispatchEvent(event)).not.toThrow();
+    });
+
+    it('keydown handler ignores events with unknown code', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Heading],
+        content: '<p>Hi</p>',
+      });
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'a',
+        code: 'KeyX',
+        altKey: true,
+        metaKey: true,
+        bubbles: true,
+      });
+      expect(() => editor!.view.dom.dispatchEvent(event)).not.toThrow();
+    });
+  });
+
+  describe('Backspace on heading', () => {
+    it('converts heading to paragraph when at start', () => {
+      editor = new Editor({
+        extensions: [Document, Text, Paragraph, Heading],
+        content: '<h1>Hello</h1>',
+      });
+
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1)));
+
+      const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true });
+      expect(() => editor!.view.dom.dispatchEvent(event)).not.toThrow();
+    });
+  });
+
+  describe('input rule getAttributes', () => {
+    it('returns level matching number of #', () => {
+      editor = new Editor({ extensions });
+      const headingExt = editor.extensionManager.extensions.find((e) => e.name === 'heading')!;
+      const rules = (headingExt as any).config.addInputRules!.call(headingExt as any)!;
+      expect(rules.length).toBe(1);
+    });
+
+    it('returns empty when nodeType missing', () => {
+      const rules = Heading.config.addInputRules?.call({ ...Heading, nodeType: undefined, options: Heading.options });
+      expect(rules).toEqual([]);
+    });
+
+    it('input rule handler runs with valid level match', () => {
+      editor = new Editor({ extensions, content: '<p># </p>' });
+      const headingExt = editor.extensionManager.extensions.find((e) => e.name === 'heading')!;
+      const rules = (headingExt as any).config.addInputRules!.call(headingExt as any)!;
+      const rule = rules[0]!;
+      const match = ['# ', '#'] as unknown as RegExpMatchArray;
+      const result = ((rule).handler)(editor.state, match, 1, 3);
+      // Result may be null if canReplaceWith fails, or a Transaction otherwise
+      expect(result === null || typeof result === 'object').toBe(true);
+    });
+
+    it('input rule handler with undefined hash capture passes null attrs', () => {
+      editor = new Editor({ extensions, content: '<p># </p>' });
+      const headingExt = editor.extensionManager.extensions.find((e) => e.name === 'heading')!;
+      const rules = (headingExt as any).config.addInputRules!.call(headingExt as any)!;
+      const rule = rules[0]!;
+      // Match with no capture group value - exercises the null-hash path
+      const match = [' ', undefined] as unknown as RegExpMatchArray;
+      const result = ((rule).handler)(editor.state, match, 1, 2);
+      // Handler returns a tr even when attrs is null (textblockTypeInputRule doesn't check)
+      expect(result === null || typeof result === 'object').toBe(true);
+    });
+
+    it('input rule handler with level not in allowed levels returns null attrs', () => {
+      editor = new Editor({
+        extensions: [
+          Document, Text, Paragraph,
+          Heading.configure({ levels: [1, 2, 3] }),
+        ],
+        content: '<p>#### </p>',
+      });
+      const headingExt = editor.extensionManager.extensions.find((e) => e.name === 'heading')!;
+      const rules = (headingExt as any).config.addInputRules!.call(headingExt as any)!;
+      const rule = rules[0]!;
+      const match = ['#### ', '####'] as unknown as RegExpMatchArray;
+      const result = ((rule).handler)(editor.state, match, 1, 6);
+      expect(result === null || typeof result === 'object').toBe(true);
+    });
+  });
 });

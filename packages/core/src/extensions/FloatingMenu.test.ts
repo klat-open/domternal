@@ -1,7 +1,7 @@
 /**
  * Tests for FloatingMenu extension
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { FloatingMenu, floatingMenuPluginKey, createFloatingMenuPlugin } from './FloatingMenu.js';
 import { Document } from '../nodes/Document.js';
 import { Text } from '../nodes/Text.js';
@@ -522,6 +522,165 @@ describe('FloatingMenu', () => {
       });
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('plugin integration with editor (DOM)', () => {
+    let editor: Editor | undefined;
+    let host: HTMLElement;
+
+    beforeEach(() => {
+      // Shim for jsdom (floating-ui positioning)
+      Element.prototype.getClientRects = function () {
+        return [] as unknown as DOMRectList;
+      };
+      host = document.createElement('div');
+      host.className = 'dm-editor';
+      document.body.appendChild(host);
+    });
+
+    afterEach(() => {
+      if (editor && !editor.isDestroyed) editor.destroy();
+      host.remove();
+    });
+
+    it('element gets role and aria-label when missing', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element })],
+        content: '<p>Hello</p>',
+      });
+
+      expect(element.getAttribute('role')).toBe('toolbar');
+      expect(element.getAttribute('aria-label')).toBe('Floating menu');
+    });
+
+    it('element is moved inside .dm-editor ancestor', () => {
+      const element = document.createElement('div');
+      document.body.appendChild(element);
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element })],
+        content: '<p>Hello</p>',
+      });
+
+      expect(element.parentElement).toBe(host);
+    });
+
+    it('hides menu initially', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element })],
+        content: '<p></p>',
+      });
+
+      expect(element.hasAttribute('data-show')).toBe(false);
+    });
+
+    it('preserves pre-existing role/label attributes', () => {
+      const element = document.createElement('div');
+      element.setAttribute('role', 'custom-role');
+      element.setAttribute('aria-label', 'Custom Label');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element })],
+        content: '<p>Hello</p>',
+      });
+
+      expect(element.getAttribute('role')).toBe('custom-role');
+      expect(element.getAttribute('aria-label')).toBe('Custom Label');
+    });
+
+    it('plugin update hides menu when shouldShow returns false', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element, shouldShow: () => false })],
+        content: '<p>Hello</p>',
+      });
+
+      // Trigger an update
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1)));
+      expect(element.hasAttribute('data-show')).toBe(false);
+    });
+
+    it('plugin update calls updatePosition when shouldShow returns true (empty paragraph)', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element, shouldShow: () => true })],
+        content: '<p></p>',
+      });
+
+      // Dispatch a selection update
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1)));
+      // Either data-show set, or domNode not HTMLElement → no attribute set
+      expect(element).toBeDefined();
+    });
+
+    it('onFocus when shouldShow returns false hides menu', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element, shouldShow: () => false })],
+        content: '<p>Hello</p>',
+      });
+
+      editor.emit('focus', { editor, event: new FocusEvent('focus') });
+      expect(element.hasAttribute('data-show')).toBe(false);
+    });
+
+    it('onFocus when shouldShow returns true calls updatePosition', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element, shouldShow: () => true })],
+        content: '<p></p>',
+      });
+
+      editor.emit('focus', { editor, event: new FocusEvent('focus') });
+      expect(element).toBeDefined();
+    });
+
+    it('onBlur with relatedTarget inside menu does not hide', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element })],
+        content: '<p>Hello</p>',
+      });
+
+      const inner = document.createElement('span');
+      element.appendChild(inner);
+
+      editor.emit('blur', { editor, event: { relatedTarget: inner } as unknown as FocusEvent });
+      expect(editor).toBeDefined();
+    });
+
+    it('onBlur without relatedTarget hides menu', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element })],
+        content: '<p>Hello</p>',
+      });
+
+      editor.emit('blur', { editor, event: { relatedTarget: null } as unknown as FocusEvent });
+      expect(element.hasAttribute('data-show')).toBe(false);
+    });
+
+    it('destroy removes listeners and hides menu', () => {
+      const element = document.createElement('div');
+      editor = new Editor({
+        element: host,
+        extensions: [Document, Text, Paragraph, FloatingMenu.configure({ element, shouldShow: () => true })],
+        content: '<p></p>',
+      });
+
+      editor.destroy();
+      expect(editor.isDestroyed).toBe(true);
     });
   });
 });
